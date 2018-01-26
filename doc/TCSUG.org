@@ -1,0 +1,436 @@
+#+TITLE Chez Scheme Version 9 User's Guide Learning Notes(中文)
+* 前言
+  Chez Scheme 用户手册学习笔记。
+* 1.引言
+  Chez Scheme V9 完全实现R6RS，以及一系列扩展;编译器通过额外增加编译时间，做到
+更快代码。这是The Scheme Programming Language(TSPL4)的扩展。TSPLS4只写R6RS标准
+接口，TCSUG 描述了Chez Scheme扩展（工业项目实施的基础）。
+  第二章 *程序开发、脚本、发布、生成有效代码*
+  第三章 *调试及对象检查工具*
+  第四章 *分离的过程文档工具(document facilities for ...)*
+  第五章 *绑定形式(binding forms)*
+  第六章 *控制结构*
+  第七章 *操作非数值对象(nonnumeric objects)*
+  第八章 *高效数值操作*
+  第九章 *IO操作及通用端口*
+  第十章 *R6RS库及控制、跟踪接口*
+  第十一章 *语法扩展及模块*
+  第十二章 *定制交互及用户接口*
+  第十三章 *存储管理系统控制*
+  第十四章 *定制表达式编辑器*
+  第十五章 *本地线程系统及句法*
+  第十六章 *各种兼容特征*
+  结尾     *参考文献(bibliography) 形式摘要(summary of forms)和索引*
+** 1.语法(Chez Scheme Syntax)
+   CS 扩展了Scheme的对象和语法形式。
+   - *语法扩展*
+     0abc,+++,..,{,} 是合法的标识
+     \或|逃逸打印, \||\| -> \|
+     |hit me!| 带空格标识
+     #36rZZ is 35 X 36 + 35, or 1295
+     #\000 is equivalent to #\nul.
+     #\alarm, #\backspace, #\delete, #\esc, #\linefeed, #\newline
+     #\page, #\return, #\space, and #\tab #\bel, #\ls, #\nel, #\nul
+     #\rubout, and #\vt (or #\vtab)
+     #3(a b c) #100(0)一百空间的向量
+     #&17 box(int 17)
+     #% $primitive form; %2%car == $primitve 2 car
+     #!eof end-of-file object, 插在文件中间阻止加载后续内容
+     #!bwb broken weak pointer object
+   - *词汇扩展(lexical extensions)*
+     #!r6rs
+     #!chezscheme
+     import RNSR --program
+     scheme-script
+     load-program
+     #!fold-case string-foldcase
+     #!no-fold-case
+     #f case-senstitive
+     write, put-datum, pretty-print, and the format ~s
+     print-extended-identifiers
+     print-vector-length
+** 2.符号约定(Notational Conventitions)
+   unspecified 返回任意类型值
+   通常返回 void 对象
+   must 必须如此，否则异常
+   should 因该如此，否则结果不确定
+   &sssertion
+   &syntax 违反语法规定
+** 3.参数(Parameters)
+** 4.More Information
+* 2.Using Chez Scheme
+** 1.Interacting with ChezScheme(交互式Scheme)
+   最有效的编程方式是使用vi 或 emacs，使用Chez Schem 在shell中进行调试。
+默认安装后在shell下输入命令 *scheme* 即可开始交互式Scheme会话，输入命令 *petite*
+开始 Petite Chez Scheme。 "REPL" 代表 "Read(读)-Eval(求值)-Print(打印)-LOOP
+(循环 )"
+
+[zriemann7@localhost doc]$ scheme
+Chez Scheme Version 9.5.1
+Copyright 1984-2017 Cisco Systems, Inc.
+
+> (cons 'a '(b c d))
+(a b c d)
+> 
+
+使用 --script --program 命令行选项，debug-on-exception --debug-on-exception
+Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
+*(load "source/code/path.ss") 加载源文件*
+*(compile-file "source/code/path.ss") 编译源文件得到path.so*
+加载预编译文件本质上和加载源文件相同，但加载*path.so*更快。
+*echo '(compile-file "path/file.ss")' | scheme -q*
+*echo '(reset-handler abort) (compile-file "path/file.ss")' | scheme -q*
+** 2.Expression Editor(表达式编辑器)
+   介绍编辑器快捷键
+** 3.The Interaction Environment(交互环境)
+   RNRS 标识符只能被定义一次，Interaction 可以定义多次；
+*chezcheme* *scheme* *RNRS* 库；
+引入rnrs库:
+#+BEGIN_SRC scheme
+(import
+ (rnrs)
+ (rnrs eval)
+ (rnrs mutable-pairs)
+ (rnrs mutable-strings)
+ (rnrs r5rs))
+#+END_SRC
+交互环境引入rnrs库:
+#+BEGIN_SRC scheme
+(interaction-environment
+ (copy-environment
+  (environment
+   '(rnrs)
+   '(rnrs eval)
+   '(rnrs mutable-pairs)
+   '(rnrs mutable-strings)
+   '(rnrs r5rs))
+  #t))
+#+END_SRC
+包含 chezscheme 库 library import
+#+BEGIN_SRC scheme
+;; chezscheme library and import
+(interaction-environment
+ (copy-environment
+  (environment
+   '(rnrs)
+   '(rnrs eval)
+   '(rnrs mutable-pairs)
+   '(rnrs mutable-strings)
+   '(rnrs r5rs)
+   '(only (chezscheme) library import))
+  #t))
+#+END_SRC
+*内建变量只读，不能被赋值*
+#+BEGIN_SRC scheme
+;;Exception: attempt to assign immutable variable cons
+(set! cons +)
+
+;; redefines cons to count the number of times it is called
+;; 重定义 cons
+(define cons-count 0)
+(define original-cons cons)
+(define cons
+  (lambda (x y)
+    (set! cons-count (+ cons-count 1))
+    (original-cons x y)))
+;; assigns cons to its original value
+;; 还原 cons
+(set! cons original-cons)
+;; 还原 cons +1
+(import (only (chezscheme) cons))
+;; 
+(define cons (let () (import scheme) cons))
+
+;;
+(library (A) (export a)
+         (import (rnrs))
+         (define-syntax a
+           (lambda (x)
+             (syntax-case x ()
+               [(_ id) (free-identifier=? #'id #'undefined)]))))
+(let () (import (A)) (a undefined))
+
+;;
+(library (A) (export a aux-a)
+         (import (rnrs) (only (chezscheme) syntax-error))
+         (define-syntax aux-a
+           (lambda (x)
+             (syntax-error x "invalid context")))
+         (define-syntax a
+           (lambda (x)
+             (syntax-case x (aux-a)
+               [(_ aux-a) #''okay]
+               [(_ _) #''oops]))))
+;; okay
+(let () (import (A)) (a aux-a))
+;; oops
+(let () (import (only (A) a)) (a aux-a))
+#+END_SRC
+** 4.Using Libraries and Top-Level Programs(库与顶层程序)
+   *load/load-library* 显式加载 *重定义* 已定义的库
+   *import* 隐式加载 *不重载* 已定义的库，库文件必须位于同目录下；
+   *library-directories* 库搜索路径
+   *library-extensions* 扩展库参数
+   *source-directires*
+   如：基础库目录/usr/lib/scheme, 库名称(app lib1) 和扩展 *.sls*
+   则全路径为 /usr/lib/scheme/app/lib1.sls
+   扩展器(expander)优先加载最新的对象文件
+   *compile-imported-libraries*
+   *compile-file(#!chezscheme)/compile-library(隐含#!r6rs)*
+   *import-notify #t*
+   *echo '(compile-library "filename")' | scheme -q*
+
+   *load-program(self-contained) | load(顶层域)* 加载程序
+   *compile-program*
+   *echo '(compile-program "filename")' | scheme -q*
+   *revisit*
+** 5.Scheme Shell Scripts(Scheme脚本)
+   --script 制定是Scheme脚本
+   参考 src/script/c2-command-line.sh
+   *--libdirs* 
+   $ scheme --libdirs "/home/mio/lib:"
+   ("/home/mio/lib" . "/home/moi/lib")
+   $ scheme --libdirs "/home/moi/libsrc::/home/moi/libobj:"
+   ("/home/moi/libsrc" . "/home/moi/libobj")
+
+   *--libexts*
+#+BEGIN_SRC scheme
+#! /usr/bin/scheme --script
+;; 打印脚本参数
+(for-each
+ (lambda (x) (display x) (newline))
+ (cdr (command-line)))
+#+END_SRC
+#+BEGIN_SRC scheme
+#! /usr/bin/scheme --script
+;; implements the triditional Unix echo command
+;; 实现传统的 Unix echo 命令
+(let ([args (cdr (command-line))])
+  (unless (null? args)
+          (let-values ([(newline? args)
+                        (if (equal? (car args) "-n")
+                            (values #f (cdr args))
+                            (values #t args))])
+            (do ([args args (cdr args)] [sep "" " "])
+                ((null? args))
+              (printf "~a~a" sep (car args)))
+            (when newline? (newline)))))
+#+END_SRC
+** 6.Optimization(优化)
+   - avoid the use of top-level(interaction-environment) bindings.
+     避免顶层绑定.
+   - *compile-whole-program* 全程优化
+   - *load-program* 使用 *compile-program/library* 不要使用 *compile-file*
+   - 使用optimize-level 3 参数
+     *(parameterize ([optimize-level 3]) (compile-program "filename"))*
+     *echo '(compile-program "filename")' | scheme -q --optimize-level 3*
+   - 使用fixnum 或 flonum 操作替代通用数值操作
+   - 使用显式循环而不是嵌套线性表处理 (append/reverse/map)
+** 7.Customization(定制)
+   Chez Scheme由多个子系统组成：
+   - *kernel* 封装系统接口，加载引导或堆文件，启动交互会话，启动脚本，释放系统
+   - *petite.boot/scheme.boot* 包含编译器的运行时库
+** 8.Building and Distribution Applications(构建和发布应用程序)
+   Petite Chez Scheme *Characteristics(特性)*.
+   *Preparing Application Code.*
+   *generate-inspector-information #f* 关闭检测
+   *strip-fasl-file* 删除调试信息
+   #+BEGIN_SRC scheme
+   (scheme-start
+    (lambda fns
+      (for-each
+       (lambda (fn)
+         (printf "loading ~a ..." fn)
+         (load fn)
+         (printf "~%"))
+       fns)
+      (new-cafe)))
+   #+END_SRC
+   #+BEGIN_SRC scheme
+   ;; windows 下加载state.dll 的show_state接口
+   (define show-state)
+   (define app-init
+     (lambda ()
+       (load-shared-object "state.dll")
+       (set! show-state
+             (foreign-procedure "show_state" (integer-32)
+                                integer-32))))
+   (scheme-start
+    (lambda fns
+      (app-init)
+      (app-run fns)))
+   #+END_SRC
+   *Building and Running the Application*
+   通过cat / copy 命令将多个对象文件组成一个文件
+   compile-whole-program 
+** 9.Command-Line Options
+* Debugging(调试)
+** Tracing
+   all libraries: (chezscheme)
+   *(trace-lambda name formals body1 body2 ...)*
+   returns:a traced procedure
+#+BEGIN_SRC scheme
+(define half
+  (trace-lambda half (x)
+                (cond
+                 [(zero? x) 0]
+                 [(odd? x) (half (- x 1))]
+                 [(even? x) (+ (half (- x 1)) 1)])))
+#+END_SRC
+   *(trace-case-lambda name clause ...)*
+   returns: a traced procedure 
+   *(trace-let name ((var expr) ...) body1 body2 ...)*
+   returns: the values of body body1 body2 ...
+   *(trace-do ((var init update) ...) (test result ...) expr ...)*
+   returns: the values of last result expression
+   *(trace/untrace var1 var2 ...)*
+   returns: a list of var1 var2
+   *(trace/untrace)*
+   return: a list of all currently traced top-level variables
+   *trace-output-port thread parameter*
+   *trace-print thread parameter*
+   *(trace-define var expr)*
+   *(trace-define (var . idspec) body1 body2 ...)*
+   returns: unspecified
+   *(trace-define-syntax keyword expr)*
+** 2.The Interactive Debugger(交互调试器)
+   all libraries:(chezscheme)
+   *debug-on-exception #t*
+   *(debug) procedure*
+** 3.The Interactive Inspector(交互检查)
+   *(inspect)   is-procedure*
+   *(printf/p <obj>) using-pretty-print*
+   *(write/w <obj>) using-write*
+   *(size <obj>)*
+   *(find expr [g])*
+   *(find-next)*
+   *(up/u)*
+   *(top/t)*
+   *(forward/f)*
+   *(back/b)*
+   *(=> <expr>)*
+   *(file <path>)*
+   *(mark/m)*
+   *(goto/g)*
+   *(new-cafe/n) enters a new read-eval-print loop(cafe)*
+   *(quit/q)*
+   *(reset/r)*
+   *(abort/a <x>)*
+   Continuation commands
+   *(show-frames/sf)*
+   *(depth)*
+   *(down/d)*
+   *(show/s)*
+   *(show-local/sl)*
+   *(length/l)*
+   *(ref/r)*
+   *(code/c)*
+   *(file)*
+   Procedure commands
+   *(show/s)*
+   *(code/c)*
+   *(file)*
+   *(length)*
+   *(ref/r)*
+   *(set!/! <n>)*
+   *(eval/e <expr>)*
+   Pair(list)commands
+   *(show/s [n]) shows the first [n]/all elements of the list*
+   *(length/l)*
+   *(car)*
+   *(cdr)*
+   *(ref/r)*
+   *(tail [n])*
+   Vector,Bytevector,Fxvector commands
+   *show/length/ref*
+   String commands
+   *show/length/ref/unicode/ascii*
+   Symbol commands
+   *show/value/name/property-list/ref*
+   Charracter commands
+   *unicode/ascii*
+   Box commands
+   *show/unbox/ref*
+   Port commands
+   *show/name/handler/output-buffer/input-buffer*
+   Record commands
+   *show/fields/name/rtd/ref/set!*
+   Transport Link Cell(TLC) commands
+   *show/keyval/tconc/next/ref*
+** 4.The Object Inspector
+   *(inspect/object <object>)  is-procedure*
+   Pair inspector objects.
+   *(<pair-object> 'type/'car/'cdr/'length)*
+   Box/TLC/Vector/Simple/Unbond/Procedure/...
+** 5.Locating objects
+   *(make-object-finder pred [x] [g])  is-procedure*
+** 6.Nested object size and compostion
+* 4.Foreign Interface(外部接口)
+  Chez Scheme 提供两种外部代码交互方式
+  1. 通过子过程同学
+  2. Scheme调用C动态或静态库，C调用Scheme动态或静态库
+** 1.Subprocess Communication(子过程通信)
+   Two procedures, *(system) and (precess)*, ARE used to create *subprocess*.
+   *(system) (precess)* 用于创建子过程
+   *(system <command-string>)  is-procedure* 同步等待，stdin/out与console通信
+   *(precess <command-string>)  is-prcedure* 异步进行，stdin/out与Scheme通信
+   *(open-process-ports command [b-mode] [?transcoder])*
+** 2.Calling out of Scheme(外部调用Scheme)
+   *(foreign-rpcedure entry-exp (param-type ...) ret-type)   is-syntax*
+   *(foreign-procedure conv ecntry-exp (param-type ...) res-type)  is-syntax*
+   returns: a procedure
+   
+C 接口
+int id(int x){return x;}
+Scheme 引入C接口
+#+BEGIN_SRC scheme
+(foreign-procedure "id" (int) int)
+;; #<procedure
+((foreign-procedure "id" (int) int) 1)
+;; 1
+(define int-id
+  (foreign-procedure "id" (int) int))
+(int-id 1)
+;; 1
+
+;; 可以改造成bool
+(define bool-id
+  (foreign-procedure "id" (boolean) boolean))
+(bool-id #f)
+;; #f
+(bool-id 1)
+;; #t
+#+END_SRC
+** 3.Calling into Scheme
+   *(foreign-callable [conv] proc-exp (param-type ...) res-type)  is-syntax*
+   return: a code object
+** 4.Continuations and Foreign Calls
+** 5.Foreign Data
+   *(foreign-alloc)*
+   *(foreign-free)*
+   *(foreign-sizeof)*
+   *(foreigh-ref type address offset)*
+** 6.Providing Access to Foreign Procedures
+** 7.Using Other Foreign Language
+** 8.C Library Routines
+** 9.Socket Operations
+* 5.Binding Forms
+  
+   
+   
+* 函数表
+
+|--------------+----------------------+---+---|
+| load         | 现式(explicitly)加载 |   |   |
+| load-library | 现式加载加载库       |   |   |
+| import       | 隐式(implicitly)加载 |   |   |
+
+* 生词表
+Top-level bindings are *convenient and appropriate* during program development,
+, since they simplify testing, redefinition, and tracing of *individual* proc-
+edures and syntatic forms.
+顶层绑定是 *方便和合适的* 在程序开发期间，因为他们简化了测试，重构，追踪单个过
+程和句法形式。
+While the kernel and base boot file *are essential to* the operation of all pr-
+ograms,
+内核和引导文件是启动程序的必须条件；
