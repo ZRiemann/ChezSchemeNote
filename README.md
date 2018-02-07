@@ -8,15 +8,15 @@ eme是基于其编译器是目前最先进的实现以及LISP的强大表达能�
 能和大家共同交流共同进步。
 
 * 目录结构
-ChezScheme(root)
- |- README.dm
- |- doc
- |   |- TCSUG.org ; <The Chez Scheme User's Guilde> Learning Nodes
- |   \- TSPL.org ; <The Scheme Programming Language> Learning Notes
- |
- \- src 
-     |- zscheme ; zit公共库
-     |- TCSUG ; 示例，测试代码
-     \- TSPL  ; 示例，测试代码
+ChezScheme(root)<br/>
+ |- README.dm<br/>
+ |- doc<br/><br/>
+ |   |- TCSUG.org ; <The Chez Scheme User's Guilde> Learning Nodes<br/>
+ |   \- TSPL.org ; <The Scheme Programming Language> Learning Notes<br/>
+ |<br/>
+ \- src<br/>
+     |- zscheme ; zit公共库<br/>
+     |- TCSUG ; 示例，测试代码<br/>
+     \- TSPL  ; 示例，测试代码<br/>
  
  
