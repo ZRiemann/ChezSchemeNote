@@ -1,0 +1,759 @@
+#+TITLE The Scheme Programming Language Learning Note
+#+AUTHOR R. Kent Dybvig
+
+* Preface(序言)
+* 1.Introduction(引言)
+** 1.Scheme Syntax(语法)
+   Scheme programs _are make up of_ *keyworkd(关键字),variables(变量),structed 
+forms(结构化形式), constant data(常量数据), whitespace(空白符) and comments注*
+*释.)*
+Keyword, variables and symbols are collectively(全体/共同地) called identifiers
+关键字，变量和符号统称为标识符。
+*** *标识符*
+*Identifiers* maybe formed from letters, digits, and certain specifial characte
+rsinclude ?!.+-*/<=>:$%^_!@, as well as a setof additionall unicode characeers.
+标识符有字母，数字，某些特殊字符 和 Unicode字符。
+Identifiers can not start with at sign(@) and normally cannot start with any ch
+aracters that can start a number, i.e, a dibit, plus sign(+), minus sign(-), or
+decimal point(.).
+标识符不能以@,+,-,.开头
+Eacheptions ares +, -, and ..., which are valid identifires.
++,-,... 是合法标识符。
+and any identifier starting with *->* are all identifiers.
+任何以 *->* 开始的都是标识符。
+*Identifiers* *are delimited* by whitespace, comments, parentheses, brackets, strin
+g(double)quotes("), and hash marks(#).
+*标识符* 由 *空白符、注释、圆括号、括号、双引号字符串、哈西标记* 分割。
+A delimited or any other Unicode character may be included any where within the
+name of an identifier as an escape of the form _\xsv_, where _sv_ is the scalar
+value of the character in hexadecimal natation.
+标识符内任何地方可以使用逃逸字符\xsv表示，sv是十六进制数值。
+There is no inherent limit on the length of a Scheme identifier;
+标识符长度不限；
+programmers may use as many characters as necessary.
+程序员可以使用必要多的字符。
+Long identifiers are no substitute for comments,
+长的标识符不能替代注释，
+however, and frequent use of long identifiers can make a program difficult to
+format and consequently(因此) difficult to read.
+然而，频繁使用长标识符会使程序难格式化也因此难以阅读。
+*不建议使用长标识符* 
+A good rule to use a short identifiers when the scope of identifer is small and
+longer identifiers when the scope is larger.
+一个好的规则是，小作用域使用短标识符，大作用域使用长标识符。
+Identifiers may *be written* in any mix of upper- and lower-case letters, and 
+*case is significant(重要/有意义的)*,i.e, For example, abcde, Abcde,AbCDe all 
+refer to different identifiers. This is a change from previous versions of the 
+Revised Report.
+标识符是 *大小写敏感* 的，这是一个不同于以前修订报告。
+*** *列表、向量*
+Structured forms and list constants *are enclosed within parenthese*, e.g., (a 
+b c) or (* (- x 2) y). The empty list *is written ()*.
+结构化形式和列表常量使用圆括号包含起来.
+Matched sets of brackets([]) may *be used* in place of parentheses and are ofte
+n used to set off the subexpressions of certain standards syntactic forms for r
+eadability, as shown in examples througout this book.
+配对的方括号用于在子表达式中替代圆括号，提高句法的可读性。
+Vectors *are written* similary to list, except that they *are preceded* by #(and
+ terminated by), e.g., #(this is a vector of symbols).
+*向量* 类似列表，但头部(尾部)增加 # 。
+Bytevectors *are written* as sequences of unsigned byte values(exact integers 
+in  the range 0 through 255) bracketed by *#vu8(...)*, e.g., *#vu8(30 255 46 
+78)*.
+*字节向量* 以 #vu8 打头 包含 0~255 的数值。
+
+*** Strings(字符串)  and Numbers(数值)
+Strings *are enclosed* in double quotation marks, e.g.,"I am a string".
+*字符串* 使用双引号包含。
+*Characters are preceded by #\, e.g, #\a.*
+*字符* 使用 *#\* 前缀，如 #\a 表示字符 a。
+Case is important within character and stirng constants, as within identifiers.
+和标识符一样，字符串常量和字符常量是 *大小写敏感* 的。
+*Numbers* may *be written as integers*, e.g, -123, *as ratios*,e.g, 1/2, in *fl
+oating-point* or *scientific notation*,e.g.,1.3 or 1e23, or as *complex number
+s in rectangular or polar notations*,e.g.,1.3-2.7i or -1.2@73.
+*数值* 表示方式如 *整数* *有理数* *浮点数* *科学表示法* *复数(矩形坐标、极坐标
+)* 
+Case is not important in the syntax of a number.
+*数值表示不区分大小写(大小写不敏感)*
+The *boolean* values representing _true_ and _false_ *are written* #t and #f.
+*bool 值表示 _真_ _假_ 写成 #t 和 #f*
+Scheme conditional expressions actually treat #f as false and all other object
+as true, so 3, 0, (), "false" and nil all *count as当作* true.
+*Scheme 条件表达式非 #f 即为真*
+Details of the syntax for each type of constant data *are given* in the individ
+ual sections of Character 6 and the formal syntax of Scheme starting on page 45
+5.
+常数据语法在第六章，形式语法在455页后又详细介绍。
+*** Scheme expressions(表达式) and Comments(注释)
+*Scheme expressions* may span several lines, and no explicit terminator is requ
+ired.
+*Scheme 表达式* 可以跨越多行，并且没有明确的结束限定。
+Since the number of whitespace characters(space and newlines) between expressio
+ns is not sinificat(总要), Scheme programs *should be intended* to show the str
+ucture of the code in a way that makes the code as readable as possible.
+由于表达式间有多少空白符并不重要，程序使用 *缩进* 显示代码结构是代码尽可能易读
+*Comments* may appear on any line of a Scheme program, between a semicolon(;) a
+nd the end of the line.
+*注释* 可以出现在任意行使用分号(;)包含.
+Comments explaining a particular Scheme expresssion are normally palacd at the 
+same indentation level as expresion, on the line before the expression.
+注释一个表达式，通常在表达式上一行并和表达式保持同一缩进级别，
+Comments explaining a procedure or group of prececdures are normally placed bef
+ore the precedures, without identation.
+注释一个过程，通常在过程的上面并没有缩进格式。
+Multiple comment characters are often used to set offf the latter kind of comme
+nt, e.g., ;;; The following precedures ...
+使用多个注释符(;;;)来注释多个过程
+Two other forms of comments *are supported*: block comments and datum comments.
+支持另外两种形式的注视： *块注释* 和 *资料(数据)注释*
+*Block comments are delimited by #| and |# pairs, and may be nested.*
+块注释使用 *#| ... |#* 分割，并且可嵌套。
+A *datum comment* consists of a *#;* prefix and the datum(printed data value) t
+hat follows it. Datum comments are typically used to comment out individual def
+initions or expressions. For example, *(three #;(not four) element list)* is ju
+st what is says.
+*资料(数据)注释* 有 *#;* 作为前缀跟随 *数据值* 用于注视单个定义或表达式。
+Datum comments may also *be nested*, though #;#;(a)(b) has the somewhat nonobvi
+ous effect of commenting out both (a) and (b).
+*数据注释* 可以被嵌套
+Some Scheme values, such as procedure and ports, do not have standard printed r
+epresentations and can thus never appear as constant in the printed syntax of a
+ program. The book uses the notation #<description> when showing the output of 
+an operation that returns such a value, e.g., #<procedure> or #<port>.
+一些 *Sehcme值(如过程、端口)* 不能通过标准打印表现，不能以常理形式打印程序语法，
+本书采用 *#<描述>* 的方式显示即 *#<precedure> #<port>*
+** 2.Scheme Naming Conventions(Scheme 命名约定)
+   Scheme's naming conventions *are designed* to provide a high dagree of regul
+arity. The following is a list of these nameing conventions.
+*Scheme的命名约定* 被设计成提供高度规则性。 以下列出了命名约定。
+- Predicate names end in a question mark(?). Predicates are procedures that ret
+  urn a true or false answer, such as eq?,zero?,string?. The common numeric com
+  parators =,<,>,<=,>= *are excetions* to this name conversion.
+  *谓词* 使用问号(?)结尾。 *谓词是一个返回真假值得过程*
+- *Type predicates* such as pair?, *are created* from the name of type, in this
+  case pair, and the questiong mark.
+  *类型谓词* 使用类型名后缀?表示，如： 是否为pair类型， *pair?*
+- The names of procedures that convert an object of one type into an object of 
+  another type are written as type->type2,e.g., *vector->list*.
+  过程转化一个对象到另一个对象使用 类型1->类型2。
+- The names of precedures and syntactic forms that *cause side effacts* end wit
+  h an exclamation point(!).
+  对产生副作用的过程和语法形式使用感叹号(!)结尾。
+Programmers should employ these same conventions in their own code whenever pos
+sible.
+程序员任何时候必须在他们的代码中准守以上约定。
+** 3.Typographical and Notational Conventions(字体排版与符号预订)
+A standard procedure or syntactic form whose sole purpose is to perform some si
+de effect is said to return unspecified.
+一个标准过程或句法形式唯一目的是产生返回未知名的一些副作用。(获取结果)
+This means that an implementation is free to return any number of values, each 
+of which can be any Scheme object, as the value of the procedure or syntactic f
+orm.
+这意味着一个过程或句法的实现可以返回任意多个值，每个值可以是任意的Scheme对象。
+Do not count on these values being the same across implementations, the same ac
+ross versions of the same implementation, or even the same across two uses of t
+he procedure or syntaticform.
+_不要期望这些值在实现上是一样的，相同版本甚至相同的过程或句法。_
+Some Scheme systems routinely(常规地) use a special object to represent unspeci
+fied values.
+通常一些Scheme系统使用特定对象表示未指定的值。
+Printing of this object is often suppressed by interactive Scheme systems, so t
+hat the values of expressions retuning unspecified values are not printed.
+一些交互式Scheme系统抑制打印这些对象，因此表达式返回未知的值不被打印。
+While most standard procedures return a single value, the language supports pro
+cedure that returns zero, one, more then one, or even a variable number of valu
+es via the mechanisms described in Section 5.8.
+多数过程放回一个值，语言支持返回0，1，>1 甚至一个可变数量的值(5.8节)。
+Some standard expressoins can evaluate to multiple values if one of their subex
+pressions evaluates to multiple values,e.g., by calling a procedure that return
+s multiple values.
+标准表达式可以对多值进程求值，如果他们的子表达式通过调用一个返回多值的过程计算出
+多值。
+When this situation can occur, an expression is said to return "the values" rath
+er than simply "the value" of its subexpression.
+但返回多值的情况发生，说放回多个值比返回一个值更合理。
+Similary, a standard procedure that returns the values resulting from a call to
+ a procedure arguments is said to return the values returnd by the precedure ar
+gument.
+类似地，一个标准过程从调用一个过程参数返回的值表达成过程参数返回的值。
+This book uses the words "must" and "should" to describe program requirements, 
+such as the requirement to provide an index that is less then the length of the
+ vector in al call to vector-ref. If the word "must" is used, it means that the
+ requirement is enforced by the implementation, i.e., an exceptions is raised, 
+usually with condition type &assertion. If the word "should" is used, an except
+ion may or may not be raised, and if not, the behavior of the program is undefi
+ned.
+本书使用"必须"和"应该"去表述程序需求，违反使用"必须"的条件见返回异常。违反使用
+"应该"的情况可能会产生异常也可能不产生异常但程序结果是未定义的(不可预测的)。
+
+The phrase *syntax violation* *is used* to describe a situation in which a prog
+ram *is malformed*. Syntax violation *are deteched prior to* program execution.
+When a syntax violation is-deteced, an exception of type &syntax is-raised and 
+program is not executed.
+*语法错误* 被用来表示程序格式错误的情况。语法错误在程序执行前被检查。但语法错误
+被检测到，将产生&syntax类型的异常，程序不被执行。
+
+The typographical conventions used in this book are-straightforward. All Scheme
+objects are-printed in a *typewriter typeface打字机字体*, just as they are to b
+e typed at the keyboard. This include syntactic keywords, variables, constant o
+bjects, Scheme expressions, and example programs. An italic typeface is-used to
+set off syntax variables in the descriptions of syntactic forms and arguments i
+n the descriptions of procedures. Italics are also used to set off technical te
+rms the first time they appear.
+本书的印刷约定是简洁的。所有Scheme对象都使用打字机字体，就如同他们从键盘输入的一
+样。Scheme 对象包括 *关键字、变量、常量对象、表达式和示例程序* 。 *斜体字* 用于
+指出 *句法变量 和 过程参数*, 也用于 *第一次出现的技术术语*。
+
+In general, names of syntactic forms and procedures are never *capitalized大写*
+even at the beginning of a sentence. The same is true for syntax varialble writ
+ten in italics.
+通常句法和过程的名字不会大写，即使是在句首。同样适用于语法变量使用斜体字的形式。
+
+In the description of a syntactic form or procedure, one or more prototype patt
+erns show the syntactic form or forms or the correct number of numbers of argum
+ents for an application of the procedure.
+在描述一个句法形式或一个过程，一个或多个原型样式显示句法形式、形式或应用过程的正
+确参数。
+The keyword or procedure name is-given in typewrite font, as are-parentheses.
+*关键字、过程名、圆括号使用打印机字体*
+The remaining pieces of the syntax or arguments are show in italics, using a na
+me that implies the type of expression or argument expected by the syntactic fo
+rm or procedure.
+*其余部分 使用斜体字* 使用名字指出 *表达式类型* 或 *句法、过程的参数*
+*Ellipses* are-used to specify *zero or more occurrences* of a subexpression or
+arguments. For example, (=or= /expr/ ...) describes the or syntatic form, which 
+has zero or more subexpressions, and (=member= /obj/ /list/)describes the member 
+procedure, which expects two arugments, an object and a list.
+*省略号* 用于指定保护 *0个或多个(不定参数)* 的子表达式或参数。例如(or expr ...)
+=or= 句法形式含有0个或多个子表达式。(=member= /obj/ /list/)表示 =member= 过程包
+含2个参数，其中一个对象参数和一个列表参数。
+A *syntax violation* occors if the structure of a syntactic form not match its 
+*prototype*.
+如果句法形式不匹配 *句法原型声明* 将发生 *语法错误*。
+Similarly, an exception with condition type =&assertion= is-raised if the numbe
+r of arguments passed to a standard procedure does not match what it is specifi
+ed to receive.
+同样，如果一个标准过程的参数传递不匹配他的指定接受类型将抛出 =&assertion= 类型
+异常。
+A exception with condition type =&assertion= is also raised if a standard proce
+dure receives an augument whose type is not the type implied by its name or doe
+s not meet other *criteria标准* given in the description of the procedure. For 
+example, the prototype for =vector-set!= is =(vector-set /vector/ /n/ /obj/)=
+and the description says that =/n/= must be an *exact精确的* nonnegative intege
+r *strictly严格的* less than the length of =/vector/=. Thus, =vector-set!= must
+recevie three arguments, the first of which must be a vector, the second of whi
+ch must be a exact nonnegative integer less than the length of the vector, and 
+the third of which may be any Scheme value. Otherwise, an exception with condit
+ion type =&assertion= is-raised.
+如果一个标准过程接受到不是参数名称指定的类型或符合表述的其他标准，也将抛出异常。
+例如句法原型 =(vector-set! /vector/ /n/ /obj/)= 表述了 =/n/= 是精确的非负整数严
+格的小于 =vector= 长度，第三个参数是任意的Scheme对象，否则引起断言异常。
+In most cases, the type of argument required is *obvious明显的*, as with vector
+, =/obj/=, or =/binary-input-port/=.
+大部分情况下，参数类型是明显的，如 =/vector,obj,binrary-input-port/= 。
+In others, primarily within the descriptions of numeric routines, abbreviations
+areused, such as =/int/= for integer, =/exint/= for exact integer, and =/fx/= f
+or fixnum. These abbreviations are-explained at the start of the section contai
+ning the effected entries.
+另外，主要的数值类型使用 *缩写* 形式表示。 *int* 指整数， *exint* 指精确的整数
+*fx* 指固定大小的数。 这些缩写在本节开头已经有解释。
+* 2.Getting Started(开始)
+  This chapter is an introduction to Scheme for programmers who are new to he l
+anguage. You will get more from this chapter if you are sitting in front of an 
+interactive Scheme system, trying out the examples as you go.
+本章正对Scheme新手进行介绍，如果你使用交互式Scheme系统进行训练效果将会效果更好。
+After reading this chapter and working the exercise, you should be able to star
+t using Scheme. You will have learned the syntax of Scheme program and how they
+are-executed, along with how to use simple data structures and control mechanis
+ms.
+通过阅读本章和完成练习，将掌握如何使用Scheme。将学到Scheme程序语法，其如何被执
+行，使用数据结构和控制机制。
+** 1.Interacting with Scheme(和Scheme进行交互)
+*** 1.交互式环境
+   Most Scheme system provide an interactive programming enviroment that simpli
+fies program development and experimentation.
+大多数Scheme系统提供交互编程环境，这样简化了程序的开发和实验。
+
+The simplest interaction with Scheme follows a "read-evaluate-print" cycle. A p
+rogram(often called a read-evaluate-print loop, or REPL) reads each expression 
+you type at the keyboard, evaluates it, and prints its value.
+最简单的Scheme交互遵循 读-求值-打印 循环。 一个REPL程序读取键盘输入的表达式，对
+其进行求值然后把值打印出来。
+
+With an interactive Scheme system, you can type an expression at the keyboard a
+nd see its value immediately.
+通过Scheme交互系统，可以键盘输入表达式并立刻看到表达式的值。
+
+You can define a procedure and apply it to arguments to see how it works.
+可以定义一个过程，用相应的参数调用他，观察其如何工作的。
+
+You can even type in an entire program consisting of a set of procedure definit
+ions and test it without leaving the system.
+在不断开交互系统前提下，可以编写并测试一个由一系列相关联的过程组成的程序。
+
+When you program starts getting longer, it will be more convenient to type it i
+nto a file(using a text editor), load the file and test it interactively.
+当程序变得越来越大时，将程序写到文件里面去，并加载文件进行交互式
+的测试是一个非常便利的做法。
+
+In most Scheme system, a file may be-loaded with the nonstandard procedure load
+, which takes a string argument naming the file.
+大多数Scheme系统，使用一个非标准过程 =(load "/file/")= 来加载文件。
+
+Preparing you program in a file has several advantages: you have a chance to co
+mpose you program more carefully, you can correct errors without retyping the p
+rogram, and you can retain a copy for later use. Most Scheme implementations tr
+eat expressions loaded from a file the same as expressoins typed at the keyboar
+d.
+使用文件来保持程序是非常有利的：
+*有机会精心组织程序*
+*修改错误是不需要重新打印程序*
+*保留一份副本供以后使用*
+大多数Scheme实现一致的方式对待 *从文件导入* 和 *键盘输入* 的表达式。
+
+While Scheme provides various input and output procedures, the REPL takes care 
+of reading expressions and printing their values. This frees you to concentrate
+on writing your program without worrying about how its results will be display
+ed.
+Scheme 提供多样的输入输出过程， REPL 细心的读取表达式并打印其值。这解放了结果如
+何显示的细节思考，专注于编写程序。
+*** 2.(表达式)=>表达式输出值
+    The examples in this chapter and in the rest of the book follow a regular f
+ormat. An expression you might type from your keyboard is-given first, possibly
+spanning several lines. The value of expression is-given after the *=>*, to be- 
+read as "evaluates to." The => is-omitted for definitions and when the value of
+an expression is-unspecified.
+本书的示例代码遵循正规格式。一个表达式，可能跨越多行。其值打印在 *=>* 后面，读
+作"求值得到"。当未为定义时将 *省略 is-omitted* =>。
+*** 3.美观的代码格式
+The example programs are-formatted in a style that "looks nice" and conveys the
+struct of the program.
+示例以"美观"的格式展示程序结构。
+The code is easy to read because the relationship between each expression and i
+ts subexpressions is clearly shown.
+由于表达式和子表达式间清晰地显示结构使得代码阅读非常容易。
+Scheme ignores indentation and line breaks, however, so there is no need to fol
+low a particular sytle.
+Scheme 忽略缩进和换行，然后，他不需要遵守特定的格式。
+The important thing is to establish one style and keep to it. Scheme sees each 
+programs as if it were on a single line, with its subexpressions ordered from l
+eft to right.
+只保持一条重要的规则，Scheme对待每个程序为单行代码，以从左到右的顺序排列子表达
+式。
+*** 4.常量表达式示例
+    If you have access to an interactive Scheme system, it might be a good idea
+to start it up now and type in the examples as you read.
+如果你打开了Scheme交互系统，一个好的主意是现在开始输入每一个你读到的示例代码。
+One of the simplest Scheme expressions is a *string constant*.
+最简单的表达式是 *字符常量string-constant*.
+Try typing "Hi Mom!"(including the double quotes) in response to the prompt.
+试着在 *提示符prompt* 后输入"Hi Mom"(包含双引号)。
+The system should respond with "Hi Mom!"; the value of any constant is constant
+itself.  "Hi Mon" => "Hi Mon"
+系统将应答"Hi Mom!"; *常量的值是常量自身*
+
+"hello" => "hello"
+42 => 42
+22/7 => 22/7
+3.141592653 => 3.141592653
++ => #<procedure +>
+(+ 76 31) => 107
+(* -12 10) => -120
+'(a b c d) => (a b c d)
+
+Be careful not to miss any single quotes('), double quotes("), or pharentheses.
+*注意不要遗漏任何单引号('),双引号("),圆括号*
+If you left off a single quote in the last expression, you probaly received a m
+essage indicating that an exception has occurred.
+如果你丢了最后那个表达式的单引号，将收到一个异常消息。
+Just try again. If you left off a closing parentheses or double quote, the syst
+em might still be waiting for it.
+在尝试一次，如果你遗漏由圆括号或双引号，系统将继续等待输入。
+
+There are a few more expressions to try. You can try to figure out on your own 
+what they mean or wait to find out later in the chapter.
+这里是更多表达式，可以指出其含义或者在本章的后续找出其含义。
+(car '(a b c)) => a
+(cdr '(a b c)) => (b c)
+(cons 'a '(b c)) => (a b c)
+(cons (car '(a b c))
+      (cdr '(d e f))) => (a e f)
+
+As you can see, Scheme expressions may span more then one line. The Scheme know
+s when it has a entire expression by matching double quotes and parentheses.
+如上Scheme表达式可以跨越多行。Scheme通过配对双引号和圆括号来识别出完整的表达式。
+*** 5.定义过程(defining a procedure)
+    Next, let's try defining a procedure.
+    接下来，让我们尝试定义一个过程。
+#+BEGIN_SRC scheme
+;; square(n)
+(define square
+  (lambda (n)
+    (* n n)))
+#+END_SRC
+The procedure =square= computes the square n^2 of any number n. We say more abo
+ut the expressions that make up this deifnitions later in this chapter.
+这个过程计算了n的平方。我们将在本章的后面更多地讲解这个表达式组成。
+For now it suffices to say that =define= establishes variable bindings =lambda=
+creates procedures, and =*= names the multiplicatoin procedure.
+当前将 =define= 理解为建立变量绑定， =lambda= 理解为创建过程， =*= 表示乘法过程
+就 *足够suffices* 了。
+Note the form of these expressions.
+记住这些表达式的形式。
+All structured forms *are-enclosed in parentheses* and written in *prefix notation*
+i.e., the operator precedes the arugments.
+所有形式的构造都 *被一对圆括号包围* ，并且采用 *前序标记法* 即操作在参数前面。
+As you can see, this is true even for simple arithmetic orprations such as *.
+如你所见，乘法操作数也是如此，采用前序标记法。
+Try using square.
+
+(square 5) => 25
+(square -200) => 40000
+(square 0.5) => 0.25
+(square -1/2) => 1/4
+
+Even through the next definition is short, you might enter it into a file. Let'
+s assume you call the file "reciprocal.ss".
+让我们定义一个叫倒数的过程，保存到 "reciprocal.ss" 文件中，虽然有代码点短。
+#+BEGIN_SRC scheme
+(define reciprocal
+  (lambda (n)
+    (if (= n 0)
+        "oops!"
+        (/ 1 n))))
+#+END_SRC
+This procedure, =reciprocal=, computes the quantity 1/n for any number n!=0. Fo
+r n = 0, =reciprocal= returns the string "oops!". Return to Scheme and try load
+ing your file with procedure =load=.
+=reciprocal= 这个过程当n不等于0时对n求倒数，当n等于0时返回"oops!"字符串。保存文
+件后，使用 =load= 加载这个过程。
+Finally, try using the procedure we have just defined.
+
+(reciprocal 10) => 1/10
+(reciprocal 1/10) => 10
+(reciprocal 0) => "oops!"
+(reciprocal (reciprocal 1/10)) => 1/10
+
+In the next section we will discuss Scheme expressions in more detail.
+在下一节我们将更详细的讨论表达式。
+Throughout this chapter, keep in mand that your Scheme system is one of the mos
+t useful tools for learning Scheme.
+请记住Scheme交互系统是最有效的学习Scheme编程的方式。
+Whenever you try one of the examples in the text, follow it up with your own ex
+amples. In an interactive Scheme system, the cost of trying something out is re
+latively small--usually just the time to type it in.
+每当尝试一个示例，非常的便捷，仅仅需要打印一下的时间 。
+** 2.Simple Expressions(简单的表达式)
+   The simplest Scheme expression are *constant data objects*, such as strings,
+numbers, symbols, and list.
+最简单的Scheme表达式是 *数据对象常量* 例如：字符串，数值，符号，列表。
+Scheme supports other object types, but thess for are enough for many programs.
+Scheme 支持其他的对象类型，但上面的四类对象已经满足很多程序的需求。
+We saw some examples of strings and numbers in preceding section.
+我们在前面一节已经看到了一些字符串和数值的示例。
+*** 1.讨论数值细节(discuss numbers in a little more detail)
+    Let's discuss numbers in a little more detail. Number are *constants*. If y
+ou enter a number, Scheme echos it back to you. The following examples show tha
+t Scheme supports several types of numbers.
+123456789987654321 => 123456789987654321
+3/4 => 3/4
+2.718281828 => 2.718281828
+2.2+1.1i => 2.2+1.1i
+让我们在详细一点的讨论数值。数值是一个常数。如果输入一个数值，Scheme将回射这个数
+。下面的示例显示了Scheme支持多种数据类型。
+
+Scheme numbers include *exact integer* and *inexact integer*, *rational*, *real*
+*complex numbers*.
+Scheme数值包含 *精确整数* *不精确整数* *有理数* *实数* *复数*
+Exact integers and retional numbers have arbitrary precision, i.e., they can be 
+arbitrary size.
+精确整数和有理数具有 *任意的精度*, 即其大小是任意的。
+Inexatc numbers are usually represented internally using IEEE standard floating
+-point representations.
+非精确数值通常使用IEEE标准的浮点数表示。
+*** 2.数学运算符过程(arithmetic procedures)
+    Scheme provides the names *+ - * /* for corresponding arithmetic procedures
+Each procedure accepts two numeric arguments.
+Scheme 提供 *+ - * /* 为相应的数学运算过程。每个运算符接受2个参数。
+
+The expressions below are-called *precedure applications*, because the specify 
+the application of a procedure to a set of arugments.
+(+ 1/2 1/2) <graphic> 1
+(- 1.5 1/2) <graphic> 1.0 
+
+(* 3 1/2) <graphic> 3/2
+(/ 1.5 3/4) <graphic> 2.0
+一下表达式被称为 *过程应用程序* ，因为应用程序指定了一个参数集合到了一个过程。
+Scheme employs prefix notation even for common arithmetic operations.
+*** 3.前序标记法
+Scheme 对数学运算符同样采用 *前序标记法* 。
+Any procedure application, whether the procedure taske zero, one or two, or mor
+e arugments, is-written as =(procedure /arg/ ...)=.
+任何过程应用程序，不论其包含 0，1，2，... 个参数都写成 =(procedure /arg/ ...)=
+This regularity simplifies the syntax of expressions;
+*前序标记法* 规则简化了表达式的语法；
+one notation is-employed regardless of the operation, and there are no complica
+ted rules regarding the precedence or assiciativity of operators.
+*前序标记法* 是的任意的操作只遵循一个标准，没有复杂的运算符优先级和结合性问题。
+*** 4.过程嵌套(Procedure applications may be-nested)
+    Procedure applications may be-nested, in which chase the innermost values a
+re computed first. We can thus nest applications of the arithmetic procedure gi
+ven above to evalute more complicated formulas.
+(+ (+ 2 2) (+ 2 2)) => 8
+(- 2 (* 4 1/3)) => 2/3
+(* 2 (* 2 (* 2 (* 2 2)))) => 32
+(/ (* 6/7 7/2) (- 4.5 1.5)) => 1.0
+
+过程可以被嵌套，当需要 *内部值innermost* 先被计算时。我们可以嵌套算数过程来计算
+更 *复杂的公式complicated formulas* 。
+
+These examples demonstrate everything you need to use Scheme as a four-function
+desk calculator.
+上面这些示例演示了使用Scheme实现一个 *四则运算* 的桌面计算器。
+While we will not discuss them in this chapter, Scheme supports many other arit
+hmatic preocdures.
+本章我们不讨论Scheme支持的其他算数运算过程。
+Now might be a good time to turn to Section 6.4 and experiment with some of them.
+现在可能是一个好时机，跳到6.4节去实验他们。
+
+*** 5.聚合数据结构(aggregate data structures)
+    Simple numeric objects are sufficient for many tasks, but sometimes aggrega
+te data structures containing two or more values are-needed.
+简单数值通常是满足一些任务的需求，但有时需要包含两个及以上值得 *数据结构* 。
+*** 6.列表(数据聚合的基础)
+In many languages, the basic aggregate data structure is the array. In Scheme, 
+it is the *list*.
+在多少语言中数组是聚合数据结构的基础，但在Scheme中 *list* 是聚合数据的基础。
+List are-written as sequences of objects surrounded by parentheses. For instanc
+e, (1 2 3 4 5) is a list of numbers, and ("this" "is" "a" "list") is a list of 
+string.
+*列表* 在书写时被一对圆括号包含，如(1 2 3 4 5)是数值列表，("this" "is" "a" "list")
+是一个字符串列表。
+List need not contain only one type of object, so (4.2 "hi") is a valid list co
+ntaining a number and a string.
+*列表* 不局限于包含一类对象。
+Lists may be nested (may contain other list), so ((1 2) (3 4))is a valid list w
+ith two elements, each of which is a list of two elements.
+*列表* 可以 *嵌套*
+*** 7.单引号运算符(' 明确指定为列表)
+    You might notice that list looks just like procedure applications and wonde
+r how Scheme tell them apart. That is, how does Scheme distinguish between a li
+st of objects =(/obj1/ /obj2/ ...)= and a procedure application 
+=(proc /arg/ ...)=
+你也许发现了列表和过程非常相似，并向知道Scheme如何区分列表和过程。
+In some cases, the distinction might seem obvious. The list of numbers (1 2 3)
+could hardly be confused with a procedure application, since 1 is a number, no
+t a procedure.
+一些情况下，区别是明显的。列表(1 2 3)很难和过程混淆，因为1是数值不是过程。
+So, the answer might be that Scheme looks at the first element of the list or
+procedure application and makes its decision based on whether that firt element
+is a procedure or not.
+因此，一个可能的答案是看第一项是否为过程。
+This answer is not good enough, since we might even want to treat a valid proce
+dure application such as (+ 3 4) as a list.
+这个答案并不足够好，因为有时我们想将一个过程视作一个列表，如(+ 3 4)。
+The answer is that we must tell Scheme explicitly to treat a list as data rathe
+r than as a procedure application. *We do this with quote*
+
+(quote (1 2 3 4 5)) => (1 2 3 4 5)
+(quote ("this" "is" "a" "list")) => ("this" "is" "a" "list")
+(quote (+ 3 4)) => (+ 3 4)
+
+正确答案是我们通过 *前缀单引号的方式来明确告示Scheme将过程视作列表* 。
+
+The =quote= forces the list to be-treated as data. Try entering the above expre
+ssions without the quote; you will likely receive a message indicating that an 
+excetpions has occurrd for the first two and an incorrent answer(7) for the thi
+rd.
+=quote= 强制列表视作数据。试着不带quote输入以上表达式，你将收到一个消息指出前两
+个表达式一次和第三个表达式返回一个不完整的答案7。
+
+Because =quote= is-required firly frequently in Scheme code, Scheme recognizes 
+a single quotion mark (') precedding an expression as an abbreviation for quote
+#+BEGIN_SRC scheme
+'(1 2 3 4)
+'((1 2) (3 4))
+'(/ (* 2 -1) 3)
+#+END_SRC
+应为 =quote= 使用非常频繁，为了方便Scheme使用缩写的单引号 ' 前缀到表达式上。
+Both forms are-refered to as quote expressions. We often say an object is-quote
+d when it is enclose in a quote expression.
+=(quote (1 2 3))= 和 '(1 2 3) 是等价的表达式。当单引号包含一个表达式时通常称对象
+被引用。
+A quote expression is /not/ a procedure application, since is *inhibits(阻止)* 
+the evaluation of its subexpression. It is a entirely different syntactic form.
+引用表达式不是过程，应为阻止了其子表达式被求值。这是一个完全不同的句法。
+Scheme supports several other syntactic forms in addition to preocedure applica
+tions and quote expressions.
+出quote句法外，Scheme 还支持另外几种句法。
+Eache syntactic form is-evaluated differently. Fortunately, the number of diffr
+rent syntactic is small. We will see more of them in this chapter.
+每种句法都有不同的求值方式。幸运的是句法不多，我们将在本周看到大部分。
+*** 8.符号与变量(symbol and variable)
+Not all quote expressions involve lists. Try the following expression with and 
+without the quote wrapper.
+(quote hello) => hello
+不是所有引用表达式都包含列表。
+The *symbol* hello must be-quoted in orde to *prevent防止* Scheme from treating
+hello as a /variable/.
+符号hello必须被引用，为了防止hello被当作变量。
+Symbols and variables in Scheme are similar to symbols and viarables in mathema
+tical expressions and equations.
+Scheme的符号和变量类似于数学表达式和方程式的符号和变量。
+When we evaluate the mathmatical expression 1 - x for some value of x, we think
+of x as a *variable*.
+当我们使用x的一些值求值一个数学表达式(1 - x)时，我们把x想象成变量。
+On the other hand, wend we consider the *algebraic equation* x^2 - 1 = (x-1)(x+
+1), we think of x as a *symbol* (in fact, we tink of the whole equation symboli
+cally).
+另一方面，我们认为代数方程式是一个符号。
+Just as quoting a list tells Scheme to treat a parenthesized form as a list rah
+her than as a procedure applicatoin, quoting an identifire tell Scheme to treat
+the identifier as a symbol than as a variable.
+就如同引用一个列表告知Scheme将括号内的形式视作列表而不是过程，引用一个标识符告
+诉Scheme将标识符作为符号而不是变量。
+While symbols are commonly used to represent variables in symbolic representati
+ions of equations or program, symbols may also be-used, for example, as words i
+n the representation of natural language sentence.
+在方程式或程序中，符号通常被表示为变量，如在自然语言中符号表示成单词。
+*** 9.程序也是数据(同质特性)
+You might wonder why applicatons and variables shared notations with list and s
+ymbols.
+你可能想知道为什么程序和变量都使用同一种标记法，列表和符号。
+The shared notation allows Scheme programs to be-represented as Scheme data, si
+plifying the writing of interpreters, compilers, editors, and other tools in Sc
+heme.
+*共享标记法使得Scheme程序可视作Scheme数据，这样简化了解释器，编译器，编辑器和*
+*其他Scheme工具的开发*
+This is-demonstrated by the Scheme interpreter given in Scetion 12.7, which is 
+itself written in Scheme. Many people believe this is to be one of the most im
+portant features of Scheme.
+使用Scheme语言编写Scheme语言的解释器，很多人相信这是Scheme语言的重要特性。
+*** 10.数据、字符串的引用就是自身
+    Numbers and strings may be quoted, too.
+'1 => 1
+'2/3 => 2/3
+(quote "Hi Mom!") => "Hi Mom!"
+Number and string are-treated as constants in any case, however, so quoting the
+m is unnecessary.
+在任何情况下数值和字符串被当作常来，因此不需要进行引用操作。
+*** 11.列表操作过程(procedures for manipulating lists)
+    Now let's discuss some Scheme proecedure for manipulating lists. There are 
+two basic procedure for taking lists apart: =car= and =cdr= (pronouced could-er
+). =car= return the first element of a list, and =cdr= returns the remainder of
+the list.(The names car and cdr are-derived from operations supported by the fi
+rst computer on which a Lisp language was-implemented, the IPM 704.)Each requir
+es a nonempty list as its arguments.
+现在让我们讨论一些列表操作相关的过程。有两个基本过程，car 获取列表的第一项，cdr
+获取列表的后续项。car和cdr都需要一个非空列表作为其参数
+(car '(a b c)) => a
+(cdr '(a b c)) => (b c)
+(cdr '(a)) => () 
+
+(car (cdr '(a b c))) => b
+(cdr (cdr '(a b c))) => (c) 
+
+(car '((a b) (c d))) => (a b)
+(cdr '((a b) (c d))) => ((c d))
+
+(cons 'a '()) => (a)
+(cons 'a '(b c)) => (a b c)
+(cons 'a (cons 'b (cons 'c '()))) => (a b c)
+(cons '(a b) '(c d)) => ((a b) c d) 
+
+(car (cons 'a '(b c))) => a
+(cdr (cons 'a '(b c))) => (b c)
+(cons (car '(a b c))
+      (cdr '(d e f))) => (a e f)
+(cons (car '(a b c))
+      (cdr '(a b c))) => (a b c)
+
+*proper list(常规列表)*
+(a b)
+[a,-]->[b,()]
+*improper/dotted list(非常规/点列表)*
+(a . b)
+[a,b]
+
+** 3. Evaluating Scheme Expressions(表达式求值)
+   Let's turn to a discussion of how Scheme evaluates the expressions you type.
+下面我们讨论Scheme是如何求值表达式。 
+We have already established the rules for constant objects such as strings and 
+numbers: the object itself is the value.
+我们已经建立了对象构造规则，如字符串和数值对象本身就是表达式值。
+You have probably also worked out in your mind a rule for evaluating applicatio
+ns of the form =(procedure arg1 ... argn)= .
+你可能在自己的脑海中已经算出 =(procedure arg1 ... argn)= 的求值过程。
+Here, /porcedure/ is an expression representing a Scheme procedure, and arg1 ..
+argn are expressions representing its arugments. One possiblity is the following
+*(quote expressons) 引用表达式不求值*
+Constant objects, preocedure applications, quote expressions are only three of 
+many syntactic forms provided by Scheme.
+*常量、过程、引用 三类核心句法， 外还有少数其他句法根据核心句法扩展的*
+*扩展句法 (let ((key value) ...)) (lambda (arg...) body...)*
+1. 从左向右求值
+2. 过程变了求值方式和过程求值一样
+(car '(+ - * /) 2 3) => Exception: attempt to apply non-procedure +
+(car (+ - * /) 2 3) => Exception in +: #<procedure -> is not a number
+*(car (list + - * /) 2 3) => 5*
+** 4.Variables and Let Expressions
+*(let ((var expr)...) body1 body2 ...)*
+*let* 句法实现了 一个 *值* *绑定* 一个 *变量*
+优点：避免相同表达式的重复写于计算。
+  (+ (* 4 4) (* 4 4)) => 32
+  (let ((a (* 4 4))) (+ a a)) => 32
+*[] 可以替代 () 方便阅读*
+[let [[x 2]] [+ 2 x]] => 4
+*变量作用域在let表达式内*
+*(let ...) 可嵌套定义*
+*如有同名变量，内存变量则掩盖外层变量，使得外表变量不可见*
+(let ([x 1])
+  (let ([x (+ x 1)])
+    (+ x x))) => 4
+外部x *scope作用域* 外部括号 减去 内部括号；
+*lexical scope词法作用域*
+** 5. Lambda Expressions (lambda 表达式)(简单理解为匿名过程)
+lambda 解决了 let 表达式的局限；
+((lambda (x) (+ x x)) 3) ==> 6
+(let ([x 3]) (+ x x))
+
+let/lambda 混合应用
+
+(let ([x 'a])
+  (let ([f (lambda (y) (list x y))])
+    (f 'b))) => (a b)
+x 相对于 lambda 是自由变量， *自由变量必须已绑定* ；
+y 相对于 lambda 不是自由变量；
+
+*(let ([x 'a]) (cons x x)) ≡ ((lambda (x) (cons x x)) 'a)*
+*let 是由 lambda 扩展的*
+
+(let ([f (lambda x x)])
+  (f 1 2 3 4)) => (1 2 3 4) 
+
+(let ([f (lambda x x)])
+  (f)) => () 
+
+*lambda (x . y) y 表示所有剩余的参数, 类似C的 fn(args ...)*
+(let ([g (lambda (x . y) (list x y))])
+  (g 1 2 3 4)) => (1 (2 3 4)) 
+
+(let ([h (lambda (x y . z) (list x y z))])
+  (h 'a 'b 'c 'd)) => (a b (c d))
+
+> (let ([f (lambda (x) x)])
+  (f 'a))
+a
+> (let ([f (lambda x x)])
+  (f 'a))
+(a)
+> (let ([f (lambda (x . y) x)])
+  (f 'a))
+a
+> (let ([f (lambda (x . y) y)])
+  (f 'a))
+()
+> 
+How might the primitive procedure list be-defined?
+** 6. Top-Level Definitions(顶层定义/全局定义)
