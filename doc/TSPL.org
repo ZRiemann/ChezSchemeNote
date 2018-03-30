@@ -24,7 +24,7 @@ and any identifier starting with *->* are all identifiers.
 *Identifiers* *are delimited* by whitespace, comments, parentheses, brackets, strin
 g(double)quotes("), and hash marks(#).
 *标识符* 由 *空白符、注释、圆括号、括号、双引号字符串、哈西标记* 分割。
-A delimited or any other Unicode character may be included any where within the
+A delimited or any other Unicode character may be-included any where within the
 name of an identifier as an escape of the form _\xsv_, where _sv_ is the scalar
 value of the character in hexadecimal natation.
 标识符内任何地方可以使用逃逸字符\xsv表示，sv是十六进制数值。
@@ -135,7 +135,7 @@ arity. The following is a list of these nameing conventions.
   case pair, and the questiong mark.
   *类型谓词* 使用类型名后缀?表示，如： 是否为pair类型， *pair?*
 - The names of procedures that convert an object of one type into an object of 
-  another type are written as type->type2,e.g., *vector->list*.
+  another type are-written as type->type2,e.g., *vector->list*.
   过程转化一个对象到另一个对象使用 类型1->类型2。
 - The names of precedures and syntactic forms that *cause side effacts* end wit
   h an exclamation point(!).
@@ -145,7 +145,7 @@ sible.
 程序员任何时候必须在他们的代码中准守以上约定。
 ** 3.Typographical and Notational Conventions(字体排版与符号预订)
 A standard procedure or syntactic form whose sole purpose is to perform some si
-de effect is said to return unspecified.
+de effect is-said to return unspecified.
 一个标准过程或句法形式唯一目的是产生返回未知名的一些副作用。(获取结果)
 This means that an implementation is free to return any number of values, each 
 of which can be any Scheme object, as the value of the procedure or syntactic f
@@ -543,7 +543,7 @@ st of objects =(/obj1/ /obj2/ ...)= and a procedure application
 =(proc /arg/ ...)=
 你也许发现了列表和过程非常相似，并向知道Scheme如何区分列表和过程。
 In some cases, the distinction might seem obvious. The list of numbers (1 2 3)
-could hardly be confused with a procedure application, since 1 is a number, no
+could hardly be-confused with a procedure application, since 1 is a number, no
 t a procedure.
 一些情况下，区别是明显的。列表(1 2 3)很难和过程混淆，因为1是数值不是过程。
 So, the answer might be that Scheme looks at the first element of the list or
@@ -586,7 +586,7 @@ the evaluation of its subexpression. It is a entirely different syntactic form.
 引用表达式不是过程，应为阻止了其子表达式被求值。这是一个完全不同的句法。
 Scheme supports several other syntactic forms in addition to preocedure applica
 tions and quote expressions.
-出quote句法外，Scheme 还支持另外几种句法。
+除quote句法外，Scheme 还支持另外几种句法。
 Eache syntactic form is-evaluated differently. Fortunately, the number of diffr
 rent syntactic is small. We will see more of them in this chapter.
 每种句法都有不同的求值方式。幸运的是句法不多，我们将在本周看到大部分。
@@ -693,7 +693,7 @@ many syntactic forms provided by Scheme.
 *常量、过程、引用 三类核心句法， 外还有少数其他句法根据核心句法扩展的*
 *扩展句法 (let ((key value) ...)) (lambda (arg...) body...)*
 1. 从左向右求值
-2. 过程变了求值方式和过程求值一样
+2. 过程变量求值方式和过程求值一样
 (car '(+ - * /) 2 3) => Exception: attempt to apply non-procedure +
 (car (+ - * /) 2 3) => Exception in +: #<procedure -> is not a number
 *(car (list + - * /) 2 3) => 5*
@@ -757,3 +757,11 @@ a
 > 
 How might the primitive procedure list be-defined?
 ** 6. Top-Level Definitions(顶层定义/全局定义)
+   let, lambda 表达式绑定的变量对外不可见。
+   顶层定义(全局可见，除了被内部定义覆盖外)
+   *define* 创建一个顶层定义对象
+   #+BEGIN_SRC scheme
+   (define double-any
+     (lambda (f x)
+       (f x x)))
+   #+END_SRC

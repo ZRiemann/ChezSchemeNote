@@ -1,6 +1,10 @@
 ;; The Scheme Program Language
 ;; sample precedures
 
+;; usage:
+;; $ scheme
+;; $ (load "tspl.ss")
+
 ;; square(n)
 (define square
   (lambda (n)
