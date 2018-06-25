@@ -2,7 +2,7 @@
 #+AUTHOR R. Kent Dybvig
 
 * Preface(序言)
-* 1.Introduction(引言)
+* 1. Introduction(引言)
 ** 1.Scheme Syntax(语法)
    Scheme programs _are make up of_ *keyworkd(关键字),variables(变量),structed 
 forms(结构化形式), constant data(常量数据), whitespace(空白符) and comments注*
@@ -23,7 +23,7 @@ and any identifier starting with *->* are all identifiers.
 任何以 *->* 开始的都是标识符。
 *Identifiers* *are delimited* by whitespace, comments, parentheses, brackets, strin
 g(double)quotes("), and hash marks(#).
-*标识符* 由 *空白符、注释、圆括号、括号、双引号字符串、哈西标记* 分割。
+*标识符* 由 *空白符、注释、圆括号、括号、双引号字符串、哈希标记* 分割。
 A delimited or any other Unicode character may be-included any where within the
 name of an identifier as an escape of the form _\xsv_, where _sv_ is the scalar
 value of the character in hexadecimal natation.
@@ -258,7 +258,7 @@ or fixnum. These abbreviations are-explained at the start of the section contai
 ning the effected entries.
 另外，主要的数值类型使用 *缩写* 形式表示。 *int* 指整数， *exint* 指精确的整数
 *fx* 指固定大小的数。 这些缩写在本节开头已经有解释。
-* 2.Getting Started(开始)
+* 2. Getting Started(开始)
   This chapter is an introduction to Scheme for programmers who are new to he l
 anguage. You will get more from this chapter if you are sitting in front of an 
 interactive Scheme system, trying out the examples as you go.
@@ -765,3 +765,86 @@ How might the primitive procedure list be-defined?
      (lambda (f x)
        (f x x)))
    #+END_SRC
+** 2.9 Assignment(分派)
+   #+BEGIN_SRC scheme
+   ;; 全局变量
+   (define abcde '(a b c d e))
+   (set! abcde (cdr abcde))
+   ;; 局部作用域覆盖全局作用域
+   (let ([abcde '(a b c d e)])
+     (set! abcde (reverse abcde))
+     abcde)
+   ;; 变量不需要声明，可直接使用
+   ;; 请平方根 (-b(+/-)(b^2 - 4ac))/2a
+   (define quadratic-formula
+     (lambda (a b c)
+       (let ([root1 0] [root2 0] [minusb 0] [radical 0] [divisor 0])
+         (set! minusb (- 0 b))
+         (set! radical (sqrt (- (* b b) (* 4 (* a c)))))
+         (set! divisor (* 2 a))
+         (set! root1 (/ (+ minusb radical) divisor))
+         (set! root2 (/ (- minusb radical) divisor))
+         (cons root1 root2))))
+   ;; without assignment
+   (define quadratic-formula
+     (lambda (a b c)
+       (let ([minusb (- 0 b)]
+             [radical (sqrt (- (* b b) (* 4 (* a c))))]
+             [divisor (* 2 a)])
+         (let ([root1 (/ (+ minusb radical) divisor)]
+               [root2 (/ (- minusb radical) divisor)])
+           (cons root1 root2)))))
+   ;; let 只读；let! 可读写
+
+   ;; 本地状态缓存
+   (define lzay
+     (lambda (t)
+       (let ([val #f] [flag #f])
+         (lambda ()
+           (if (not flag)
+               (begin (set! val (t))
+                      (set! flag #t)))
+           val))))
+   #+END_SRC
+* 3. Going Further(进阶)
+** 3.1 Syntatic Extension(语法扩展)
+   核心句法
+   (define ...)
+   constans
+   varialbes
+   procedure application
+   quote expressions
+   lambda expressions
+   if expressions
+   set! expressions
+
+<program>	<graphic>	<form>*
+<form>	<graphic>	<definition> | <expression>
+<definition>	<graphic>	<variable definition> | (begin <definition>*)
+<variable definition>	<graphic>	(define <variable> <expression>)
+<expression>	<graphic>	<constant>
+|	<variable>
+|	(quote <datum>)
+|	(lambda <formals> <expression> <expression>*)
+|	(if <expression> <expression> <expression>)
+|	(set! <variable> <expression>)
+|	<application>
+<constant>	<graphic>	<boolean> | <number> | <character> | <string>
+<formals>	<graphic>	<variable>
+|	(<variable>*)
+|	(<variable> <variable>* . <variable>)
+<application>	<graphic>	(<expression> <expression>*)
+
+(begin e1 e2 ...) == ((lambda () e1 e2 ...))
+
+(define-syntax let
+  (syntax-rules ()
+    [(_ ((x e) ...) b1 b2 ...)
+     ((lambda (x ...) b1 b2 ...) e ...)]))
+   扩展句法
+
+** 3.2 More Recursion(更多递归)
+** 3.3 Continuations(连续性)
+** 3.4 Continuation Pass Style(连续传输方式)
+** 3.5 Internal Definitions(内部定义)
+** 3.6 Libraries(库)
