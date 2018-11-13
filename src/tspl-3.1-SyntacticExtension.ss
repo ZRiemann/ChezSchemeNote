@@ -161,6 +161,19 @@ the value of x (again).
        call/cc 以过程 p 为参数，构造一个当前continuation的具体表示(concrete representation)
        并传给 P, continuation 自身表示为一个过程 k. 当k被应用到一个值是，他返回应用程序的延续。
        如果 p 没有调用 k， 返回在是 call/cc 应用程序的值。
+作用： 实现断点调试，多任务。
+(call/cc
+  (lambda (k)
+    (* 5 4))) <graphic> 20 
+
+(call/cc
+  (lambda (k)
+    (* 5 (k 4)))) <graphic> 4 
+
+(+ 2
+   (call/cc
+     (lambda (k)
+       (* 5 (k 4))))) <graphic> 6
 
 示例：利用continuation捕获，计算阶层
 
