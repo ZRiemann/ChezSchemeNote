@@ -848,3 +848,40 @@ How might the primitive procedure list be-defined?
 ** 3.4 Continuation Pass Style(连续传输方式)
 ** 3.5 Internal Definitions(内部定义)
 ** 3.6 Libraries(库)
+* 6. Operations on Objects(对象的操作)
+  本章描述对象支持的操作，对象包括：
+  list,numbers,characters,strings,vectors,bytevectors,symbols,booleans,
+  hashtables,enumerations.
+** 6.1 Constants and Quotation(常量和引用)
+   [[file:../src/tspl-6-Operations-on-Objects/6.1-Constants-and-Quotation.ss]]
+
+*** 常量
+    syntax: constant 
+    returns: constant
+    
+*** 引用
+    syntax: (quote obj) 
+    syntax: 'obj 
+    returns: obj 
+    libraries: (rnrs base), (rnrs)
+
+    引用阻止了对象的求值，使对象作为数据。
+    常量的引用时自身，所以常量不需要进行引用。
+    引用、常量时不变的，不能通过set-car!,string-set!来操作，否则抛出异常
+    
+**** syntax: (quasiquote obj ...) 
+     准引用
+     syntax: `obj
+     
+     反引用，准引用中的内容进行求值，后拼接
+     syntax: (unquote obj ...)
+     syntax: ,obj 
+     
+     作用将列表/向量内容提取出来，拼接
+     syntax: (unquote-splicing obj ...) 
+     syntax: ,@obj 
+
+     但它允许引用文本的部分内容“不加引号”
+     
+     unquote和unquote-splicing仅在quasiquote表达式中有效。
+
