@@ -881,7 +881,101 @@ How might the primitive procedure list be-defined?
      syntax: (unquote-splicing obj ...) 
      syntax: ,@obj 
 
-     但它允许引用文本的部分内容“不加引号”
-     
+     但它允许引用文本的部分内容“进行求值”
      unquote和unquote-splicing仅在quasiquote表达式中有效。
+     
+** 6.2.Generic Equivalence and Type Predicates
+   [[file:../src/tspl-6-Operations-on-Objects/6.2-Generic-Equivalnce-and-Type-Precidcates.ss]]
 
+   谓词：返回#t或#f的过程
+   
+*** procedure: (eq? obj1 obj2) 
+    returns: #t if obj1 and obj2 are identical, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+    
+    eq? obj1,obj2指向的指针相同返回#t,否则#f。
+    - 两个不同类型的对象（布尔值，空列表，对，数字，字符，字符串，向量，符号和过程）是不同的。
+    - 具有不同内容或值的两个相同类型的对象是不同的。
+    - 布尔对象#t无论出现在哪里都与自身相同，并且#f在任何地方都与自身相同，但#t和#f是不同的。
+    - 空列表（）在其出现的任何地方都是相同的。
+    - 当且仅当它们具有相同的名称时，两个符号是相同的（通过string =？）。
+    - 不能用于可靠地比较数字和字符。
+
+*** procedure: (eqv? obj1 obj2) 
+    returns: #t if obj1 and obj2 are equivalent, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+    eqv? obj1,obj2 值相等且除eq?,eqv?外不能区分不等；
+    
+    
+*** procedure: (equal? obj1 obj2) 
+    returns: #t if obj1 and obj2 have the same structure and contents, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+    
+    
+*** procedure: (boolean? obj) 
+    returns: #t if obj is either #t or #f, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+    
+    (lambda (x) (or (eq? x #t) (eq? x #f)))
+
+*** procedure: (null? obj) 
+    returns: #t if obj is the empty list, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+    
+    (lambda (x) (eq? x '()))
+
+*** procedure: (pair? obj) 
+    returns: #t if obj is a pair, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+    
+*** procedure: (number? obj)
+    returns: #t if obj is a number object, #f otherwise 
+    procedure: (complex? obj) 
+    returns: #t if obj is a complex number object, #f otherwise 
+    procedure: (real? obj) 
+    returns: #t if obj is a real number object, #f otherwise 
+    procedure: (rational? obj) 
+    returns: #t if obj is a rational number object, #f otherwise 
+    procedure: (integer? obj) 
+    returns: #t if obj is an integer object, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+*** procedure: (real-valued? obj) 
+    returns: #t if obj is a real number, #f otherwise 
+    procedure: (rational-valued? obj) 
+    returns: #t if obj is a rational number, #f otherwise 
+    procedure: (integer-valued? obj) 
+    returns: #t if obj is an integer, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+    虚部为0.0i时 同real?,rational?,integer?
+
+*** procedure: (char? obj) 
+    returns: #t if obj is a character, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+*** procedure: (string? obj) 
+    returns: #t if obj is a string, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+*** procedure: (vector? obj) 
+    returns: #t if obj is a vector, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+*** procedure: (symbol? obj) 
+    returns: #t if obj is a symbol, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+*** procedure: (procedure? obj) 
+    returns: #t if obj is a procedure, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+*** procedure: (bytevector? obj) 
+    returns: #t if obj is a bytevector, #f otherwise 
+    libraries: (rnrs bytevectors), (rnrs)
+
+*** procedure: (hashtable? obj)
+    returns: #t if obj is a hashtable, #f otherwise 
+    libraries: (rnrs hashtables), (rnrs)
+** 6.3.List and Pairs
