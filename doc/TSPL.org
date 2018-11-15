@@ -979,3 +979,395 @@ How might the primitive procedure list be-defined?
     returns: #t if obj is a hashtable, #f otherwise 
     libraries: (rnrs hashtables), (rnrs)
 ** 6.3.List and Pairs
+   pair(cons cell) 基本结构对象。
+   [ car . cdr ]-->[last-element . ()]
+      |     |                       \- 常规列表(),非常规列表可以时任意对象
+      |     \- linked one to the next
+      \- element
+*** 构造形态
+**** 构造二叉树
+                [ptr.ptr]
+                 /    \
+               car   cdr
+**** 常规链表
+    [car . cdr]-->[car . cdr]-->...-->[car.()]
+**** 非常规链表
+    [car . cdr]
+
+    (1 2 3 . 4)
+    [1.*]-->[2.*]-->[3.4]
+
+    ((1.2).3)
+       [*.3]
+       /
+    [1.2]
+
+    (1 . (2 . (3 . ())))
+    (1 2 3)
+    [1.*]-->[2.*]-->[3.()]
+**** 环形链表
+    set-car!,set-cdr!来改变car，cdr实现环形链表
+    [1.*]-->[2.*]-->[3.*]->+
+       \---<---------------+
+*** procedure: (cons obj1 obj2) 
+    returns: a new pair whose car and cdr are obj1 and obj2 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (car pair) 
+    returns: the car of pair 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (cdr pair) 
+    returns: the cdr of pair 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (set-car! pair obj) 
+    returns: unspecified 
+    libraries: (rnrs mutable-pairs)
+*** procedure: (set-car! pair obj) 
+    returns: unspecified 
+    libraries: (rnrs mutable-pairs)
+*** procedure: (set-cdr! pair obj) 
+    returns: unspecified 
+    libraries: (rnrs mutable-pairs)
+*** procedure: (caar pair) 
+    procedure: (cadr pair)
+    procedure: (cddddr pair) 
+    returns: the caar, cadr, ..., or cddddr of pair 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (list obj ...) 
+    returns: a list of obj ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (cons* obj ... final-obj) 
+    returns: a list of obj ... terminated by final-obj 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (list? obj) 
+    returns: #t if obj is a proper list, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (length list) 
+    returns: the number of elements in list 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (length list) 
+    returns: the number of elements in list 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (list-ref list n) 
+    returns: the nth element (zero-based) of list 
+    libraries: (rnrs base), (rnrs)
+    #+BEGIN_SRC scheme
+    (define list-ref
+      (lambda (ls n)
+        (if (= n 0)
+            (car ls)
+            (list-ref (cdr ls) (- n 1))))) 
+    #+END_SRC
+*** procedure: (list-tail list n) 
+    returns: the nth tail (zero-based) of list 
+    libraries: (rnrs base), (rnrs)
+    #+BEGIN_SRC scheme
+    (define list-tail
+      (lambda (ls n)
+        (if (= n 0)
+            ls
+            (list-tail (cdr ls) (- n 1))))) 
+    #+END_SRC
+*** procedure: (append) 
+    procedure: (append list ... obj) 
+    returns: the concatenation of the input lists 
+    libraries: (rnrs base), (rnrs)
+    #+BEGIN_SRC scheme
+    (define append
+      (lambda args
+        (let f ([ls '()] [args args])
+          (if (null? args)
+              ls
+              (let g ([ls ls])
+                (if (null? ls)
+                    (f (car args) (cdr args))
+                    (cons (car ls) (g (cdr ls)))))))))
+    #+END_SRC
+*** procedure: (reverse list) 
+    returns: a new list containing the elements of list in reverse order 
+    libraries: (rnrs base), (rnrs)
+    
+    #+BEGIN_SRC scheme
+    (define reverse
+      (lambda (ls)
+        (let rev ([ls ls] [new '()])
+          (if (null? ls)
+              new
+              (rev (cdr ls) (cons (car ls) new)))))) 
+    #+END_SRC
+*** procedure: (memq obj list) 
+    eq? member
+    procedure: (memv obj list) 
+    eqv? member
+    procedure: (member obj list) 
+    equal? member
+    returns: the first tail of lwist hose car is equivalent to obj, or #f 
+    libraries: (rnrs lists), (rnrs)
+
+    #+BEGIN_SRC scheme
+    (define memq
+      (lambda (x ls)
+        (cond
+          [(null? ls) #f]
+          [(eq? (car ls) x) ls]
+          [else (memq x (cdr ls))])))
+    #+END_SRC
+*** (memp procedure list) 
+    returns: the first tail of list for whose car procedure returns true, or #f 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (remq obj list) 
+    procedure: (remv obj list) 
+    procedure: (remove obj list) 
+    returns: a list containing the elements of list with all occurrences of obj removed 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (remp procedure list) 
+    returns: a list of the elements of list for which procedure returns #f 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (filter procedure list) 
+    returns: a list of the elements of list for which procedure returns true 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (partition procedure list) 
+    returns: see below 返回多值 = 2list，#t + #f
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (find procedure list) 
+    returns: the first element of list for which procedure returns true, or #f 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (assq obj alist) 
+    procedure: (assv obj alist) 
+    procedure: (assoc obj alist) 
+    returns: first element of alwist hose car is equivalent to obj, or #f 
+    libraries: (rnrs lists), (rnrs)
+    #+BEGIN_SRC scheme
+    (define assq
+      (lambda (x ls)
+        (cond
+          [(null? ls) #f]
+          [(eq? (caar ls) x) (car ls)]
+          [else (assq x (cdr ls))])))
+    #+END_SRC
+*** procedure: (assp procedure alist) 
+    returns: first element of alist for whose car procedure returns true, or #f 
+    libraries: (rnrs lists), (rnrs)
+*** procedure: (list-sort predicate list) 
+    returns: a list containing the elements of list sorted according to predicate 
+    libraries: (rnrs sorting), (rnrs)
+    
+
+
+** 6.4.Numbers
+   分类为整数，有理数，实数或复数。
+   因为所有整数都是理性的，所有有理数都是实数，所有实数都是复数。
+   也可以归类为精确或不精确,exact? inexact?
+   Scheme中对数字的大多数操作都是精确保留：如果给定精确操作数，它们返回精确值，
+   如果给出不精确的操作数或精确和不精确操作数的组合，则返回不精确的值。
+   精确整数和有理算术通常支持任意精度;
+   
+   3+4i, 3.2-3/4i, +i
+   1.1@1.764 and -1@-1/2 
+
+   +inf.0 and -inf.0 正/负无穷大
+   +nan.0/-nan.0 非数值
+
+   - #e,#i 强制数字精确性
+   - 默认10进制，#b(binary),#o(otcal),#d(decimal),#x(hexadecimal)
+   - 但是系统打印机（由put-datum，write和display调用）和number-> string以紧凑的形式表示数字，
+*** procedure: (exact? num) 
+    returns: #t if num is exact, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (inexact? num) 
+    returns: #t if num is inexact,e #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (= num1 num2 num3 ...) 
+    procedure: (< real1 real2 real3 ...) 
+    procedure: (> real1 real2 real3 ...) 
+    procedure: (<= real1 real2 real3 ...) 
+    procedure: (>= real1 real2 real3 ...) 
+    returns: #t if the relation holds, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (+ num ...) 
+    returns: the sum of the arguments num ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (- num) 
+    returns: the additive inverse of num 
+    procedure: (- num1 num2 num3 ...) 
+    returns: the difference between num1 and the sum of num2 num3 ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (* num ...) 
+    returns: the product of the arguments num ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (/ num) 
+    returns: the multiplicative inverse of num 
+    procedure: (/ num1 num2 num3 ...) 
+    returns: the result of dividing num1 by the product of num2 num3 ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (zero? num) 
+    returns: #t if num is zero, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (positive? real) 
+    returns: #t if real is greater than zero, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (negative? real) 
+    returns: #t if real is less than zero, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (even? int) 
+    returns: #t if int is even, #f otherwise
+*** procedure: (odd? int) 
+    returns: #t if int is odd, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (finite? real) 
+    returns: #t if real is finite, #f otherwise 
+*** procedure: (infinite? real) 
+    returns: #t if real is infinite, #f otherwise 
+*** procedure: (nan? real) 
+    returns: #t if real is a NaN, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (quotient int1 int2) 
+    returns: the integer quotient of int1 and int2 
+    procedure: (remainder int1 int2) 
+    returns: the integer remainder of int1 and int2 
+    procedure: (modulo int1 int2) 
+    returns: the integer modulus of int1 and int2 
+    libraries: (rnrs r5rs)
+*** procedure: (div x1 x2) 
+    procedure: (mod x1 x2) 
+    procedure: (div-and-mod x1 x2) 
+    returns: see below 
+*** procedure: (div0 x1 x2) 
+    procedure: (mod0 x1 x2) 
+    procedure: (div0-and-mod0 x1 x2) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (truncate real) 
+    returns: the integer closest to real toward zero 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (floor real) 
+    returns: the integer closest to real toward -inf.0
+    libraries: (rnrs base), (rnrs)
+*** procedure: (ceiling real) 
+    returns: the integer closest to real toward +inf.0
+    libraries: (rnrs base), (rnrs)
+*** procedure: (round real) 
+    returns: the integer closest to real 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (abs real) 
+    returns: the absolute value of real 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (max real1 real2 ...) 
+    returns: the maximum of real1 real2 ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (min real1 real2 ...) 
+    returns: the minimum of real1 real2 ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (gcd int ...) 
+    returns: the greatest common divisor of its arguments int ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (lcm int ...) 
+    returns: the least common multiple of its arguments int ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (expt num1 num2) 
+    returns: num1 raised to the num2 power 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (inexact num) 
+    returns: an inexact representation of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (exact num) 
+    returns: an exact representation of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (exact->inexact num) 
+    (为兼容Revised5)
+    returns: an inexact representation of num 
+    procedure: (inexact->exact num) 
+    returns: an exact representation of num 
+    libraries: (rnrs r5rs)
+*** procedure: (rationalize real1 real2) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (numerator rat) 
+    returns: the numerator of rat 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (denominator rat) 
+    returns: the denominator of rat 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (real-part num) 
+    returns: the real component of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (imag-part num) 
+    returns: the imaginary component of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (make-rectangular real1 real2) 
+    returns: a complex number with real component real1 and imaginary component real2 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (make-polar real1 real2) 
+    returns: a complex number with magnitude real1 and angle real2 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (angle num) 
+    returns: the angle part of the polar representation of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (magnitude num) 
+    returns: the magnitude of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (sqrt num) 
+    returns: the principal square root of num 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (exact-integer-sqrt n) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (exp num) 
+    returns: e to the num power 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (log num) 
+    returns: the natural logarithm of num 
+    procedure: (log num1 num2) 
+    returns: the base-num2 logarithm of num1 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (sin num) 
+    procedure: (cos num) 
+    procedure: (tan num) 
+    returns: the sine, cosine, or tangent of num 
+    libraries: (rnrs base), (rnrs)
+    procedure: (asin num) 
+    procedure: (acos num) 
+    returns: the arc sine or the arc cosine of num 
+    libraries: (rnrs base), (rnrs)
+    procedure: (atan num) 
+    procedure: (atan real1 real2) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (bitwise-not exint) 
+    returns: the bitwise not of exint 
+    procedure: (bitwise-and exint ...) 
+    returns: the bitwise and of exint ... 
+    procedure: (bitwise-ior exint ...) 
+    returns: the bitwise inclusive or of exint ... 
+    procedure: (bitwise-xor exint ...) 
+    returns: the bitwise exclusive or of exint ... 
+    libraries: (rnrs arithmetic bitwise), (rnrs)
+    procedure: (bitwise-if exint1 exint2 exint3) 
+    returns: the bitwise "if" of its arguments 
+    libraries: (rnrs arithmetic bitwise), (rnrs)
+    procedure: (bitwise-bit-count exint) 
+    returns: see below 
+    libraries: (rnrs arithmetic bitwise), (rnrs)
+    procedure: (bitwise-length exint) 
+    returns: see below 
+    libraries: (rnrs arithmetic bitwise), (rnrs)
+    procedure: (bitwise-first-bit-set exint) 
+    returns: the index of the least significant bit set in exint 
+    libraries: (rnrs arithmetic bitwise), (rnrs)
+    ...
+
+    #+BEGIN_SRC scheme
+    (define bitwise-if
+      (lambda (exint1 exint2 exint3)
+        (bitwise-ior
+          (bitwise-and exint1 exint2)
+          (bitwise-and (bitwise-not exint1) exint3))))
+    #+END_SRC
+*** procedure: (string->number string) 
+    procedure: (string->number string radix) 
+    returns: the number represented by string, or #f 
+    libraries: (rnrs base), (rnrs)
+    procedure: (number->string num) 
+    procedure: (number->string num radix) 
+    procedure: (number->string num radix precision) 
+    returns: an external representation of num as a string 
+    libraries: (rnrs base), (rnrs)
