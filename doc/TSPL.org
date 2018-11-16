@@ -848,6 +848,14 @@ How might the primitive procedure list be-defined?
 ** 3.4 Continuation Pass Style(连续传输方式)
 ** 3.5 Internal Definitions(内部定义)
 ** 3.6 Libraries(库)
+* 5. Control Operations
+** 5.4.Recursion and Iteration
+*** syntax: (do ((var init update) ...) (test result ...) expr ...)
+    returns: the values of the last result expression 
+    libraries: (rnrs control), (rnrs)
+    
+    do{body...; update}while(test); expr
+    
 * 6. Operations on Objects(对象的操作)
   本章描述对象支持的操作，对象包括：
   list,numbers,characters,strings,vectors,bytevectors,symbols,booleans,
@@ -1152,7 +1160,6 @@ How might the primitive procedure list be-defined?
     libraries: (rnrs sorting), (rnrs)
     
 
-
 ** 6.4.Numbers
    分类为整数，有理数，实数或复数。
    因为所有整数都是理性的，所有有理数都是实数，所有实数都是复数。
@@ -1371,3 +1378,827 @@ How might the primitive procedure list be-defined?
     procedure: (number->string num radix precision) 
     returns: an external representation of num as a string 
     libraries: (rnrs base), (rnrs)
+** 6.5.Fixnums
+   Fixnums表示fixnum范围内的精确整数，它必须是一个闭合范围[-2w-1,2w-1 - 1]，其中w（fixnum宽度）至少为24.
+*** procedure: (fixnum? obj) 
+    returns: #t if obj is a fixnum, #f otherwise
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (least-fixnum) 
+    returns: the least (most negative) fixnum supported by the implementation 
+*** procedure: (greatest-fixnum) 
+    returns: the greatest (most positive) fixnum supported by the implementation 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fixnum-width) 
+    returns: the implementation-dependent fixnum width 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fx=? fx1 fx2 fx3 ...) 
+    procedure: (fx<? fx1 fx2 fx3 ...) 
+    procedure: (fx>? fx1 fx2 fx3 ...) 
+    procedure: (fx<=? fx1 fx2 fx3 ...) 
+    procedure: (fx>=? fx1 fx2 fx3 ...) 
+    returns: #t if the relation holds, #f otherwise 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxzero? fx) 
+    returns: #t if fx is zero, #f otherwise 
+    procedure: (fxpositive? fx) 
+    returns: #t if fx is greater than zero, #f otherwise 
+    procedure: (fxnegative? fx) 
+    returns: #t if fx is less than zero, #f otherwise 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxeven? fx) 
+    returns: #t if fx is even, #f otherwise 
+    procedure: (fxodd? fx) 
+    returns: #t if fx is odd, #f otherwise 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxmin fx1 fx2 ...) 
+    returns: the minimum of fx1 fx2 ... 
+    procedure: (fxmax fx1 fx2 ...) 
+    returns: the maximum of fx1 fx2 ...
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fx+ fx1 fx2) 
+    returns: the sum of fx1 and fx2 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fx- fx) 
+    returns: the additive inverse of fx 
+    procedure: (fx- fx1 fx2) 
+    returns: the difference between fx1 and fx2 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fx* fx1 fx2) 
+    returns: the product of fx1 and fx2 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxdiv fx1 fx2) 
+    procedure: (fxmod fx1 fx2) 
+    procedure: (fxdiv-and-mod fx1 fx2) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxdiv0 fx1 fx2) 
+    procedure: (fxmod0 fx1 fx2) 
+    procedure: (fxdiv0-and-mod0 fx1 fx2) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fx+/carry fx1 fx2 fx3) 
+    procedure: (fx-/carry fx1 fx2 fx3) 
+    procedure: (fx*/carry fx1 fx2 fx3) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxnot fx) 
+    returns: the bitwise not of fx 
+    procedure: (fxand fx ...) 
+    returns: the bitwise and of fx ... 
+    procedure: (fxior fx ...) 
+    returns: the bitwise inclusive or of fx ... 
+    procedure: (fxxor fx ...) 
+    returns: the bitwise exclusive or of fx ... 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxif fx1 fx2 fx3) 
+    returns: the bitwise "if" of its arguments 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+    #+BEGIN_SRC scheme
+    (define fxif
+      (lambda (fx1 fx2 fx3)
+        (fxior (fxand fx1 fx2)
+               (fxand (fxnot fx1) fx3))))
+    #+END_SRC
+*** procedure: (fxbit-count fx) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxlength fx) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxfirst-bit-set fx) 
+    returns: the index of the least significant bit set in fx 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxbit-set? fx1 fx2) 
+    returns: #t if bit fx2 of fx1 is set, #f otherwise 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxcopy-bit fx1 fx2 fx3) 
+    returns: fx1 with bit fx2 replaced by fx3 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxbit-field fx1 fx2 fx3) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxcopy-bit-field fx1 fx2 fx3 fx4) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxarithmetic-shift-right fx1 fx2) 
+    returns: fx1 arithmetically shifted right by fx2 bits 
+    procedure: (fxarithmetic-shift-left fx1 fx2) 
+    returns: fx1 shifted left by fx2 bits 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxarithmetic-shift fx1 fx2) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxrotate-bit-field fx1 fx2 fx3 fx4) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+*** procedure: (fxreverse-bit-field fx1 fx2 fx3) 
+    returns: see below 
+    libraries: (rnrs arithmetic fixnums), (rnrs)
+
+** 6.6.Flonums
+
+*** procedure: (flonum? obj) 
+    returns: #t if obj is a flonum, otherwise #f 
+    libraries: (rnrs arithmetic flonums), (rnrs)
+
+*** procedure: (fl=? fl1 fl2 fl3 ...) 
+    procedure: (fl<? fl1 fl2 fl3 ...) 
+    procedure: (fl>? fl1 fl2 fl3 ...) 
+    procedure: (fl<=? fl1 fl2 fl3 ...) 
+    procedure: (fl>=? fl1 fl2 fl3 ...) 
+    returns: #t if the relation holds, #f otherwise 
+    libraries: (rnrs arithmetic flonums), (rnrs)
+*** MORE procedures
+    ...
+** 6.7.Characters
+   字符是表示字母，数字，特殊符号（如$或 - ）和某些非图形控制字符（如空格和换行符）的原子对象。
+   字符使用＃\前缀编写。 #\a #\b
+   字符换行符，空格和制表符也可以这种方式编写，但它们可以更清晰地编写为＃\ newline，＃\ space和＃\ tab。
+   任何Unicode字符都可以用＃\ xn语法编写，
+*** procedure: (char=? char1 char2 char3 ...) 
+    procedure: (char<? char1 char2 char3 ...) 
+    procedure: (char>? char1 char2 char3 ...) 
+    procedure: (char<=? char1 char2 char3 ...) 
+    procedure: (char>=? char1 char2 char3 ...) 
+    returns: #t if the relation holds, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (char->integer char) 
+    returns: the Unicode scalar value of char as an exact integer 
+    libraries: (rnrs base), (rnrs)
+
+    (char->integer #\newline) ;; 10
+    (char->integer #\space) ;; 32
+    (- (char->integer #\Z) (char->integer #\A)) ;; 25
+    
+    procedure: (integer->char n) 
+    returns: the character corresponding to the Unicode scalar value n 
+    libraries: (rnrs base), (rnrs)
+    
+    n must be an exact integer and a valid Unicode scalar value, i.e., ;; or ;;.
+
+    (integer->char 48) ;; #\0
+    (integer->char #x3BB) ;; #\;;
+** 6.8.Strings
+   字符串是字符序列，通常用作消息，字符缓冲区或文本块的容器。
+   Scheme提供了创建字符串，从字符串中提取字符，获取子字符串，连接字符串以及更改字符串内容的操作。
+   字符串包含在双引号中，"this is string"
+   字符串中包含双引号的话，内部的双引号采用 \"; "this is string include \" double quotes \""
+   可以使用其他双字符序列插入各种特殊字符，例如\ n表示换行符，\ r表示回车符，\ t表示制表符。 "line1\nline2"
+*** procedure: (string=? string1 string2 string3 ...) 
+    procedure: (string<? string1 string2 string3 ...) 
+    procedure: (string>? string1 string2 string3 ...) 
+    procedure: (string<=? string1 string2 string3 ...) 
+    procedure: (string>=? string1 string2 string3 ...) 
+    returns: #t if the relation holds, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string-ci=? string1 string2 string3 ...) 
+    procedure: (string-ci<? string1 string2 string3 ...) 
+    procedure: (string-ci>? string1 string2 string3 ...) 
+    procedure: (string-ci<=? string1 string2 string3 ...) 
+    procedure: (string-ci>=? string1 string2 string3 ...) 
+    returns: #t if the relation holds, #f otherwise 
+    libraries: (rnrs unicode), (rnrs)
+
+    *case-insensitive*
+*** procedure: (string char ...) 
+    returns: a string containing the characters char ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (make-string n) 
+    procedure: (make-string n char) 
+    returns: a string of length n 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string-length string) 
+    returns: the number of characters in string 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string-ref string n) 
+    returns: the nth character (zero-based) of string 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string-set! string n char) 
+    returns: unspecified 
+    libraries: (rnrs mutable-strings)
+*** procedure: (string-copy string) 
+    returns: a new copy of string 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string-append string ...) 
+    returns: a new string formed by concatenating the strings string ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (substring string start end) 
+    returns: a copy of string from start (inclusive) to end (exclusive) 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string-fill! string char) 
+    returns: unspecified 
+    libraries: (rnrs mutable-strings)
+*** procedure: (string-upcase string) 
+    returns: the upper-case equivalent of string 
+    procedure: (string-downcase string) 
+    returns: the lower-case equivalent of string 
+    procedure: (string-foldcase string) 
+    returns: the case-folded equivalent of string 
+    procedure: (string-titlecase string) 
+    returns: the title-case equivalent of string 
+    libraries: (rnrs unicode), (rnrs)
+*** procedure: (string-normalize-nfd string) 
+    returns: the Unicode normalized form D of string 
+    procedure: (string-normalize-nfkd string) 
+    returns: the Unicode normalized form KD of string 
+    procedure: (string-normalize-nfc string) 
+    returns: the Unicode normalized form C of string 
+    procedure: (string-normalize-nfkc string) 
+    returns: the Unicode normalized form KC of string 
+    libraries: (rnrs unicode), (rnrs)
+*** procedure: (string->list string) 
+    returns: a list of the characters in string 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (list->string list) 
+    returns: a string of the characters in list 
+    libraries: (rnrs base), (rnrs)
+** 6.9.Vectors
+   对于某些应用程序，向量比列表更方便和有效。
+   Vectors的随机访问时常量复杂度O1，列表的随机访问时线性复杂度On
+   Vectors打印形式： #(obj0 obj1 obj2 ...)
+
+*** procedure: (vector obj ...) 
+    returns: a vector of the objects obj ... 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (make-vector n) 
+    procedure: (make-vector n obj) 
+    returns: a vector of length n 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (vector-length vector) 
+    returns: the number of elements in vector 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (vector-ref vector n) 
+    returns: the nth element (zero-based) of vector 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (vector-set! vector n obj) 
+    returns: unspecified 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (vector-fill! vector obj) 
+    returns: unspecified 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (vector->list vector) 
+    returns: a list of the elements of vector 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (list->vector list)
+    returns: a vector of the elements of list 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (vector-sort predicate vector)
+    returns: a vector containing the elements of vector, sorted according to predicate 
+    procedure: (vector-sort! predicate vector) 
+    returns: unspecified 
+    libraries: (rnrs sorting), (rnrs)
+** 6.10.ByteVectors
+   Bytevectors是原始二进制数据的向量。
+   bytevector的长度是它存储的8位字节的数量，而bytevector中的索引总是作为字节偏移量给出。
+** 6.11.Symbols
+   符号
+   字符串可以用于大多数相同的目的，但符号的一个重要特征使得符号之间的比较更加有效。
+   (eq? 'aaa 'aaa) ;; #t
+   (eq? "aaa" "aaa") ;; #f
+   原因是Scheme读取器（由get-datum和read调用）和过程string-> symbol目录符号在内部符号表中，
+   并且每当遇到相同的名称时始终返回相同的符号。避免逐个字符比较
+   应用：
+   - 程序表示中的标识符
+   - 符号可以用作过程之间传递的消息
+   - 列表结构记录的标签，
+   - 存储在关联列表中的对象的名称
+*** procedure: (symbol=? symbol1 symbol2) 
+    returns: #t if the two symbols are the same, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (string->symbol string) 
+    returns: a symbol whose name is string 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (symbol->string symbol) 
+    returns: a string, the name of symbol 
+    libraries: (rnrs base), (rnrs)
+** 6.12.Booleans
+*** procedure: (boolean=? boolean1 boolean2)
+    returns: #t if the two booleans are the same, #f otherwise 
+    libraries: (rnrs base), (rnrs)
+
+    boolean=? #t #t) <graphic> #t
+    (boolean=? #t #f) <graphic> #f
+    (boolean=? #t (< 3 4)) <graphic> #t
+** 6.13.Hashtables
+   Hashtables表示任意Scheme值之间的关联集。
+   但是当涉及大量关联时通常要快得多。
+
+*** procedure: (make-eq-hashtable) 
+    procedure: (make-eq-hashtable size) 
+    returns: a new mutable eq hashtable 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (make-eqv-hashtable) 
+    procedure: (make-eqv-hashtable size) 
+    returns: a new mutable eqv hashtable 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (make-hashtable hash equiv?) 
+    procedure: (make-hashtable hash equiv? size) 
+    returns: a new mutable hashtable 
+    libraries: (rnrs hashtables), (rnrs)
+    
+    (define ht (make-hashtable string-hash string=?))
+
+*** procedure: (hashtable-mutable? hashtable) 
+    returns: #t if hashtable is mutable, #f otherwise 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-hash-function hashtable) 
+    returns: the hash function associated with hashtable 
+    procedure: (hashtable-equivalence-function hashtable) 
+
+*** procedure: (equal-hash obj) 
+    procedure: (string-hash string) 
+    procedure: (string-ci-hash string) 
+    procedure: (symbol-hash symbol) 
+    returns: an exact nonnegative integer hash value 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-set! hashtable key obj) 
+    returns: unspecified 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-ref hashtable key default) 
+    returns: see below 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-contains? hashtable key)
+    returns: #t if an association for key exists in hashtable, #f otherwise 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-update! hashtable key procedure default) 
+    returns: unspecified 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-delete! hashtable key) 
+    returns: unspecified 
+    libraries: (rnrs hashtables), (rnrs)
+
+*** procedure: (hashtable-size hashtable)
+    returns: number of entries in hashtable 
+    libraries: (rnrs hashtables), (rnrs)
+*** More procedures
+    ...
+** 6.14.Enumerations
+   枚举是有序的符号集，通常用于命名和操作选项，
+   与创建文件时可能指定的缓冲区模式和文件选项一样。
+*** syntax: (define-enumeration name (symbol ...) constructor) 
+    libraries: (rnrs enums), (rnrs)
+
+    - name 用于验证symble是否为枚举中的symble
+      如果symble是枚举值，则返回该symble，否则抛出异常；
+    - constructor 可用于创建枚举类型的子集。
+      (construct x...)如果x...是name对应枚举的子集，则OK，否则句法违规
+    
+*** procedure: (make-enumeration symbol-list) 
+    returns: an enumeration set 
+    libraries: (rnrs enums), (rnrs)
+
+    根据列表结合创建 枚举集合
+*** procedure: (enum-set-constructor enum-set)
+    returns: an enumeration-set construction procedure 
+    libraries: (rnrs enums), (rnrs)
+
+    根据枚举集合创建 枚举构造器
+*** procedure: (enum-set-universe enum-set) 
+    returns: the universe of enum-set, as an enumeration set 
+    libraries: (rnrs enums), (rnrs)
+
+    获取所有枚举项
+
+*** procedure: (enum-set->list enum-set) 
+    returns: a list of the elements of enum-set 
+    libraries: (rnrs enums), (rnrs)
+    
+    将枚举集合转换为列表；
+
+*** procedure: (enum-set-subset? enum-set1 enum-set2) 
+    returns: #t if enum-set1 is a subset of enum-set2, #f otherwise 
+    libraries: (rnrs enums), (rnrs)
+    判断set1 是否为 set2的子集
+
+*** procedure: (enum-set=? enum-set1 enum-set2)
+    returns: #t if enum-set1 and enum-set2 are equivalent, #f otherwise 
+    libraries: (rnrs enums), (rnrs)
+    判断子集是否相等
+    
+    
+*** procedure: (enum-set-member? symbol enum-set) 
+    returns: #t if symbol is an element of enum-set, #f otherwise 
+    libraries: (rnrs enums), (rnrs)
+
+    判断 symbol 是否为 enum-set的成员
+
+*** procedure: (enum-set-union enum-set1 enum-set2) 
+    returns: the union of enum-set1 and enum-set2 
+    并集
+    procedure: (enum-set-intersection enum-set1 enum-set2) 
+    returns: the intersection of enum-set1 and enum-set2 
+    交集
+    procedure: (enum-set-difference enum-set1 enum-set2) 
+    returns: the difference of enum-set1 and enum-set2 
+    libraries: (rnrs enums), (rnrs)
+    差集
+
+*** procedure: (enum-set-complement enum-set) 
+    returns: the complement of enum-set relative to its universe 
+    libraries: (rnrs enums), (rnrs)
+
+    获取与超级的差集
+    
+*** procedure: (enum-set-projection enum-set1 enum-set2) 
+    returns: the projection of enum-set1 into the universe of enum-set2 
+    libraries: (rnrs enums), (rnrs)
+
+    枚举set1的任何元素都不在enum-set2的Universe中。结果与enum-set2具有相同的枚举类型。
+    公共超集的最大子集
+    
+*** procedure: (enum-set-indexer enum-set) 
+    returns: a procedure that returns the index of a symbol in the universe of enum-set 
+    libraries: (rnrs enums), (rnrs)
+    
+    获取一个记录枚举集合下标的过程，用于计算枚举项的下标值；
+* 7. Input and Output(I/O)
+  所有输入和输出操作都通过端口(port)执行。
+  端口是指向（可能是无限的）数据流（通常是文件）的指针，程序可以从流中抽取字节或字符或将字节或字符放入流中的开口。
+  端口可以​​是输入端口，输出端口或两者同时。
+  Ports是一等对象，就像Scheme中的任何其他对象一样。
+  与过程类似，端口没有字符串和数字的打印表示。
+  最初有三个端口：当前输入端口，当前输出端口和当前错误端口，它们是连接到进程标准输入，标准输出和标准错误流的文本端口。
+  提供了几种打开新端口的方法。
+  
+  输入端口通常指向有限流，如存储在磁盘上的输入文件。
+  如果其中一个输入操作（例如get-u8，get-char或get-datum）被要求从已到达有限流末尾的端口读取，则返回一个特殊的eof（文件结束）对象。
+  谓词eof-object？可用于确定从输入操作返回的值是否是eof对象。
+
+  端口是二进制(binary)或文本(textual)。
+  二进制端口允许程序从底层流中读取或写入8位无符号字节或“八位字节”。
+  文本端口允许程序读取或写入字符。
+
+  在许多情况下，底层流被组织为一个字节序列，但这些字节应被视为字符的编码。
+  在这种情况下，可以使用代码转换器创建文本端口，以将字节解码为字符（用于输入）或将字符编码为字节（用于输出）。
+
+  代码转换器封装了一个编解码器，用于确定字符如何表示为字节。
+  提供了三种标准编解码器：latin-1编解码器，Unicode utf-8编解码器和Unicode utf-16编解码器。
+  - 对于latin-1编码，每个字符仅由一个字节表示。
+  - 对于utf-8，每个字符由一到四个字节表示，
+  - 对于utf-16，每个字符由二到四个字节表示，
+  
+  转码器还封装了一个eol样式，用于确定是否以及如何识别行结尾。
+  如果eol样式为none，则不会识别行结尾。其他六种标准eol样式如下：
+  lf：换行符
+  cr：回车符
+  nel：Unicode下一行字符
+  ls：Unicode行分隔符
+  crlf：回车后跟换行
+  crnel：回车后跟下一行
+
+  eol样式以不同方式影响输入和输出操作。
+  对于输入，除了none之外的任何eol样式都会将每个行结束字符或双字符序列转换为单个换行符。
+  对于输出，除了none之外的任何eol样式都会将换行符转换为与eol样式关联的特定单字符或双字符序列。
+  在输入方向上，除了none之外的所有eol样式都是等效的，而在输出方向上，eol样式none和lf是等效的。
+
+  除了编解码器和eol风格之外，转码器还封装了另外一条信息：
+  一种错误处理模式，用于确定在发生解码或编码错误时发生的情况，
+  即，如果字节序列无法转换为输入方向上带有封装编解码器的字符，
+  或者字符无法转换为字节序列封装的编解码器在输出方向上。
+  
+  错误处理模式是忽略，异常或替换。
+  如果忽略错误处理模式，则忽略有问题的字节序列或字符。
+  如果异常错误处理模式，则会引发条件类型为i / o-decoding或i / o-encoding的异常;
+  在输入方向上，端口位于字节序列之外
+  如果错误处理模式为replace，则会生成替换字符或字符编码：
+  在输入方向上，替换字符是U + FFFD，而在输出方向上，替换是utf-8和utf-16编解码器的U + FFFD编码或问号字符的编码（？）对于latin-1编解码器。
+  
+  可以缓冲端口以提高效率，消除每个字节或字符对操作系统的调用开销。
+  支持三种标准缓冲模式：块(block)，行(line)和没有(none)。
+  使用块缓冲，从流中提取输入，并以一些与实现相关的大小的块发送输出到流。
+  使用行缓冲，缓冲是逐行或依赖于某些其他实现进行的。
+  行缓冲通常仅与文本输出端口的块缓冲区别开来;
+  二进制端口中没有行划分，并且可能在流可用时从流中抽取输入。
+  如果没有缓冲模式，则不执行缓冲，因此输出会立即发送到流，并且仅在需要时输入输入。
+
+  章的其余部分介绍了对代码转换器，文件端口，标准端口，字符串和字节向量端口，自定义端口，
+  常规端口操作，输入操作，输出操作，便捷I / O，文件系统操作以及字节向量和字符串之间的转换的操作。
+
+** 7.1.Transcoders(转码器)
+   转码器封装了三个值：编解码器，eol样式和错误处理模式。
+   本节介绍了在转码器上创建或操作的过程以及转码器封装的值。
+*** procedure: (make-transcoder codec) 
+    procedure: (make-transcoder codec eol-style) 
+    procedure: (make-transcoder codec eol-style error-handling-mode) 
+    returns: a transcoder encapsulating codec, eol-style, and error-handling-mode 
+    libraries: (rnrs io ports), (rnrs)
+    
+    创建转码器
+    codec latin-1,utf-8,utf-16
+    eol-style must be a valid eol-style symbol (lf, cr, nel, ls, crlf, crnel, or none);
+              它默认为平台的原生eol风格。
+    error-handling-mode 错误处理模式必须是有效的错误处理模式符号（忽略，提升或替换），并且默认为替换。
+*** procedure: (transcoder-codec transcoder) 
+    returns: the codec encapsulated in transcoder 
+    procedure: (transcoder-eol-style transcoder) 
+    returns: the eol-style symbol encapsulated in transcoder 
+    procedure: (transcoder-error-handling-mode transcoder) 
+    returns: the error-handling-mode symbol encapsulated in transcoder 
+    libraries: (rnrs io ports), (rnrs)
+
+    获取转码器的编码器，换行模式，错误处理模式
+*** procedure: (native-transcoder) 
+    returns: the native transcoder 
+    libraries: (rnrs io ports), (rnrs)
+
+    本机代码转换器依赖于实现，可能因平台或语言环境而异。
+*** procedure: (latin-1-codec) 
+    returns: a codec for ISO 8859-1 (Latin 1) character encodings 
+    procedure: (utf-8-codec) 
+    returns: a codec for Unicode UTF-8 character encodings 
+    procedure: (utf-16-codec) 
+    returns: a codec for Unicode UTF-16 character encodings 
+    libraries: (rnrs io ports), (rnrs)
+
+    创建编码器
+*** syntax: (eol-style symbol) 
+    returns: symbol 
+    libraries: (rnrs io ports), (rnrs)
+    
+    检测行结束格式。
+    (eol-style crlf) <graphic> crlf
+    (eol-style lfcr) <graphic> syntax violation
+*** procedure: (native-eol-style) 
+    returns: the native eol style 
+    libraries: (rnrs io ports), (rnrs)
+*** syntax: (error-handling-mode symbol) 
+    returns: symbol 
+    libraries: (rnrs io ports), (rnrs)
+    
+** 7.2.OpeningFiles(打开文件)
+   每个文件打开操作都接受一个路径参数，该参数命名要打开的文件。
+   它必须是一个字符串或一些其他依赖于实现的值来命名文件。
+   
+   一些文件打开过程接受可选选项，b-mode和?transcoder参数。
+   options必须是在下面的file-options条目中描述的构成有效文件选项的符号上设置的枚举，并且默认为（file-options）的值。
+   b-mode必须是下面缓冲模式条目中描述的有效缓冲模式，并且默认为block。
+   ?transcoder必须是 transcoder或#f;
+   如果它是代码转换器，则打开操作返回基础二进制文件的转码端口，而如果它是#f（默认值），则打开操作返回二进制端口
+   本节中的过程创建的二进制端口支持port-position,set-port-position!！操作。
+   
+*** syntax: (file-options symbol ...)
+    returns: a file-options enumeration set 
+    libraries: (rnrs io ports), (rnrs)
+    有三种标准文件选项：no-create，no-fail和no-truncate，它只影响创建输出（包括输入/​​输出）端口的文件打开操作。
+    
+    默认选项如果文件已存在，则引发条件类型i / o-file-already-exists的异常，
+    如果文件尚不存在则创建该文件。
+    如果包含no-fail选项，则如果文件已存在则不会引发异常;相反，文件被打开并截断为零长度。
+    
+*** syntax: (buffer-mode symbol) 
+    returns: symbol 
+    libraries: (rnrs io ports), (rnrs)
+    
+    必须是 block, line, or none. 
+
+*** syntax: (buffer-mode? obj) 
+    returns: #t if obj is a valid buffer mode, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+    判断是否合法的模式
+
+*** procedure: (open-file-input-port path) 
+    procedure: (open-file-input-port path options) 
+    procedure: (open-file-input-port path options b-mode) 
+    procedure: (open-file-input-port path options b-mode ?transcoder) 
+    returns: a new input port for the named file 
+    libraries: (rnrs io ports), (rnrs)
+
+    打开文件输入端口，读取文件
+    
+*** procedure: (open-file-output-port path) 
+    procedure: (open-file-output-port path options) 
+    procedure: (open-file-output-port path options b-mode) 
+    procedure: (open-file-output-port path options b-mode ?transcoder) 
+
+    打开文件输出端口，写入文件
+
+*** procedure: (open-file-input/output-port path) 
+    procedure: (open-file-input/output-port path options) 
+    procedure: (open-file-input/output-port path options b-mode) 
+    procedure: (open-file-input/output-port path options b-mode ?transcoder) 
+    returns: a new input/output port for the named file 
+    libraries: (rnrs io ports), (rnrs)
+
+    打开文件读写端口；
+
+** 7.3.Standard Ports
+   本节中描述的过程返回附加到进程标准输入，标准输出和标准错误流的端口。
+   
+*** procedure: (current-input-port) 
+    returns: the current input port 
+    procedure: (current-output-port) 
+    returns: the current output port 
+    procedure: (current-error-port) 
+    returns: the current error port 
+    libraries: (rnrs io ports), (rnrs io simple), (rnrs)
+
+    当前文本输入输出端口
+    
+*** procedure: (standard-input-port) 
+    returns: a fresh binary input port connected to the standard input stream 
+    procedure: (standard-output-port) 
+    returns: a fresh binary output port connected to the standard output stream 
+    procedure: (standard-error-port) 
+    returns: a fresh binary output port connected to the standard error stream 
+    libraries: (rnrs io ports), (rnrs)
+    
+    标准文本输入输出端口
+
+** 7.4.String and Bytevector Ports
+   本节中的过程允许将字节向量和字符串用作输入或输出流。
+   
+   
+*** procedure: (open-bytevector-input-port bytevector) 
+    procedure: (open-bytevector-input-port bytevector ?transcoder) 
+    returns: a new input port that draws input from bytevector 
+    libraries: (rnrs io ports), (rnrs)
+
+    无需关闭bytevector端口;
+
+*** procedure: (open-string-input-port string) 
+    returns: a new textual input port that draws input from string 
+    libraries: (rnrs io ports), (rnrs)
+
+    无需关闭字符串端口;
+    
+*** procedure: (open-bytevector-output-port) 
+    procedure: (open-bytevector-output-port ?transcoder) 
+    returns: two values, a new output port and an extraction procedure 
+    libraries: (rnrs io ports), (rnrs)
+
+    返回多值-2个过程，一个操作，一个提取
+*** procedure: (open-string-output-port) 
+    returns: two values, a new textual output port and an extraction procedure 
+    libraries: (rnrs io ports), (rnrs)
+
+    返回多值-2个过程，一个操作，一个提取
+*** procedure: (call-with-bytevector-output-port procedure) 
+    procedure: (call-with-bytevector-output-port procedure ?transcoder) 
+    returns: a bytevector containing the accumulated bytes 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (call-with-string-output-port procedure) 
+    returns: a string containing the accumulated characters 
+    libraries: (rnrs io ports), (rnrs)
+
+** 7.5.Opeing Custom Ports
+*** procedure: (make-custom-binary-input-port id r! gp sp! close)
+    returns: a new custom binary input port 
+    procedure: (make-custom-binary-output-port id w! gp sp! close) 
+    returns: a new custom binary output port 
+    procedure: (make-custom-binary-input/output-port id r! w! gp sp! close) 
+    returns: a new custom binary input/output port 
+    libraries: (rnrs io ports), (rnrs)
+
+
+    这些过程允许程序从任意字节流创建端口。 id必须是一个命名新端口的字符串;
+    id 该名称仅用于提供信息，实现可以选择将其包含在自定义端口的打印语法（如果有）中。
+    创建自定义二进制输入/输出端口的程序通常应提供gp和sp！程序。
+
+    - r! (read procedure) 读取输入，支持get-u8,get-bytevector-n.
+      它使用三个参数调用：bytevector，start和n。从向量的start处读取n个字节
+      如果字节流在文件末尾，r！应该返回0。否则，它应该从流中读取至少一个且最多n个字节，
+      将这些字节存储在从start开始的bytevector的连续位置，并以实数正整数形式返回实际读取的字节数。
+    - w! (write procedure) 调用w!将输出发送到端口，
+      它使用三个参数调用：bytevector，start和n。写入start后的n字节到端口。
+    - gp (get position) 被调用来查询端口的位置。
+      如果是#f，则端口不支持端口位置。
+      (gp) ;; position
+    - sp! (set port's position) 
+      如果是#f，端口将不支持set-port-position！
+      (sp! 1253) ;; 设置由标位置
+    - close 被调用来关闭字节流。
+      如果是#f，则在关闭新端口时不会采取任何操作来关闭字节流。
+      (close) ;;#f 无操作，#t 进行必要操作
+
+*** procedure: (make-custom-textual-input-port id r! gp sp! close) 
+    returns: a new custom textual input port 
+    procedure: (make-custom-textual-output-port id w! gp sp! close) 
+    returns: a new custom textual output port 
+    procedure: (make-custom-textual-input/output-port id r! w! gp sp! close) 
+    returns: a new custom textual input/output port 
+    libraries: (rnrs io ports), (rnrs)
+
+** 7.6.Port Operations
+   不涉及读/写操作
+   
+*** procedure: (port? obj) 
+    returns: #t if obj is a port, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+
+    procedure: (input-port? obj) 
+    returns: #t if obj is an input or input/output port, #f otherwise 
+    procedure: (output-port? obj) 
+    returns: #t if obj is an output or input/output port, #f otherwise 
+    libraries: (rnrs io ports), (rnrs io simple), (rnrs)
+    
+    procedure: (binary-port? obj) 
+    returns: #t if obj is a binary port, #f otherwise 
+    procedure: (textual-port? obj) 
+    returns: #t if obj is a textual port, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+    
+*** procedure: (close-port port)
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+    
+    应该手动调用close-port，不应该依赖于系统close。关闭已关闭的端口不会报错，只是忽略该操作。
+    
+*** procedure: (transcoded-port binary-port transcoder) 
+    returns: a new textual port with the same byte stream as binary-port 
+    libraries: (rnrs io ports), (rnrs)
+    
+    此过程返回一个带有代码转换器代码转换器的新文本端口，以及与二进制端口相同的基础字节流，位于二进制端口的当前位置。
+    作为创建文本端口的副作用，二进制端口被关闭以防止二进制端口上的读取或写入操作干扰新文本端口上的读取和写入操作。
+    然而，基础字节流保持打开状态，直到文本端口关闭。
+    stream(open)-->binary-port(open)
+    stream(open)-->binary-port(close) ;;防止干扰textual-port，被关闭
+    stream(open)-->textual-port(open)
+    stream(close)-->textual-port(close)
+
+*** procedure: (port-transcoder port) 
+    returns: the transcoder associated with port if any, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+
+*** procedure: (port-position port) 
+    returns: the port's current position 
+    procedure: (port-has-port-position? port) 
+    returns: #t if the port supports port-position, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+
+*** procedure: (set-port-position! port pos) 
+    returns: unspecified 
+    procedure: (port-has-set-port-position!? port) 
+    returns: #t if the port supports set-port-position!, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+
+*** procedure: (call-with-port port procedure) 
+    returns: the values returned by procedure 
+    libraries: (rnrs io ports), (rnrs)
+    
+    call-with-port调用过程，将port作为唯一参数。
+    如果procedure返回，call-with-port将关闭端口并返回procedure返回的值。
+    如果在过程外创建的 *延续被调用* ，call-with-port不会自动关闭端口，
+    因为有可能在稍后的时间调用在过程内创建的另一个继续，将控制返回到过程。
+    如果过程没有返回，则只有在可以证明输出端口不再可访问的情况下，实现才可以自由关闭端口。
+    
+    下面的示例将infile的内容复制到outfile，如果存在则覆盖outfile。
+    除非发生错误，否则在复制完成后将关闭端口。
+
+    #+BEGIN_SRC scheme
+    (call-with-port (open-file-input-port "infile" (file-options)
+                      (buffer-mode block) (native-transcoder))
+      (lambda (ip)
+        (call-with-port (open-file-output-port "outfile"
+                          (file-options no-fail)
+                          (buffer-mode block)
+                          (native-transcoder)) 
+          (lambda (op)
+            (do ([c (get-char ip) (get-char ip)])
+                ((eof-object? c))
+              (put-char op c))))))
+    #+END_SRC
+
+*** procedure: (output-port-buffer-mode port) 
+    returns: the symbol representing the buffer mode of port 
+    libraries: (rnrs io ports), (rnrs)
+
+** 7.7.Input Operations
+   本节描述了主要目的是从输入端口读取数据的过程，以及用于识别或创建文件结束（eof）对象的相关过程。
+   
+*** procedure: (eof-object? obj) 
+    returns: #t if obj is an eof object, #f otherwise 
+    libraries: (rnrs io ports), (rnrs io simple), (rnrs)
+
+    当输入端口到达输入结束时，输入操作（例如，get-datum）返回文件结束对象。
+
+*** procedure: (eof-object) 
+    returns: the eof object 
+    libraries: (rnrs io ports), (rnrs io simple), (rnrs)
+    #+BEGIN_SRC scheme
+    (eof-object? (eof-object)) ;; #t
+    #+END_SRC
+    
+*** procedure: (get-u8 binary-input-port) 
+    returns: the next byte from binary-input-port, or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+    
+    读取一个无符号字节(0~255),游标+1
+    或读取到eof
+    #+BEGIN_SRC scheme
+    (let* ((vec-num (vector 0 1 2 3 4 5 6 7 8 9))
+           [vec-reader (open-bytevector-input-port vec-num)])
+      (display 'hello))
+
+    #+END_SRC
+
+*** procedure: (lookahead-u8 binary-input-port) 
+    returns: the next byte from binary-input-port, or the eof object 
+    libraries: (rnrs io ports), (rnrs)
