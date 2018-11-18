@@ -849,12 +849,115 @@ How might the primitive procedure list be-defined?
 ** 3.5 Internal Definitions(内部定义)
 ** 3.6 Libraries(库)
 * 5. Control Operations
+** 5.3.Conditionals
+*** syntax: (if test consequent alternative) 
+    syntax: (if test consequent) 
+    returns: the values of consequent or alternative depending on the value of test 
+    libraries: (rnrs base), (rnrs)
+    
+    test consequent alternative,都是过程
+    #+BEGIN_SRC c
+    if(test){
+            consequent;
+    }else{
+            auternative;
+    }
+    #+END_SRC
+*** syntax: (cond clause1 clause2 ...) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+    syntax: else  ;; auxiliary keywords
+    syntax: =>    ;; auxiliary keywords
+    libraries: (rnrs base), (rnrs exceptions), (rnrs)
+    - clause
+      (test) ;; return true
+      (test expr1 expr2 ...) ;; return last expr values
+      (test => expr) ;; return (expr test)
+    - last cause
+      clause
+      (else expr1 expr2 ...) ;; none true, return last expr values
+    - 流程
+      直到测试为真的clause返回，或最后一条else;
+    - example
+      #+BEGIN_SRC scheme
+      (let ([x 0])
+        (cond
+          [(< x 0) (list 'minus (abs x))]
+          [(> x 0) (list 'plus x)]
+          [else (list 'zero x)])) ;; (zero 0) 
+
+      (define select
+        (lambda (x)
+          (cond
+            [(not (symbol? x))]
+            [(assq x '((a . 1) (b . 2) (c . 3))) => cdr]
+            [else 0]))) 
+
+      (select 3) ;; #t
+      (select 'b) ;; 2
+      (select 'e) ;; 0
+      #+END_SRC
+   
 ** 5.4.Recursion and Iteration
+*** syntax: (let name ((var expr) ...) body1 body2 ...) 
+    returns: values of the final body expression 
+    libraries: (rnrs base), (rnrs)
+
+    命名let,是一个通用的迭代和递归构造。
+    <name>自身绑定到<let lambda>，参数列表被重新绑定到<var ...>
+    
+    #+BEGIN_SRC scheme
+    ;;; 寻找除数
+    (define divisors
+      (lambda (n)
+        (let f ([i 2])
+          (cond
+            [(>= i n) '()]
+            [(integer? (/ n i)) (cons i (f (+ i 1)))]
+            [else (f (+ i 1))])))) 
+
+    (divisors 5) ;; ()
+    (divisors 32) ;; (2 4 8 16)
+
+    ;;; int j = 0;
+    ;;; for(int i=0; i < 10; ++i){
+    ;;;   j += i;
+    ;;; }
+    (let ([j 0])
+      (let sum-j ([i 0])
+        (if (< i 10)
+            (begin
+              (set! j (+ j i))
+              (sum-j (+ i 1)))))
+      j)
+    #+END_SRC
 *** syntax: (do ((var init update) ...) (test result ...) expr ...)
     returns: the values of the last result expression 
     libraries: (rnrs control), (rnrs)
     
-    do{body...; update}while(test); expr
+    - description
+      do允许简洁地表达一种常见的限制形式的迭代。
+      变量var ...最初绑定到init ...的值，并在每次后续迭代时重新绑定到update ...的值。
+      如果test的值为true，则迭代停止，表达式result ...按顺序计算，并返回最后一个表达式的值。
+      如果test的值为false，则按顺序计算表达式expr ...，计算表达式update ...，创建var ...的新绑定到update ...的值，并继续迭代。
+    #+BEGIN_SRC scheme
+    ;;; int j = 0;
+    ;;; for(i = 0; i <= 10; ++i){
+    ;;;   j += i
+    ;;; }
+    (let ([j 0])
+      (do ((i 0 (+ i 1)))
+          ((> i 10) j)
+        (set! j (+ j i))))
+
+    ;;; 将j作为do的迭代变量；
+    (define sum-all
+      (lambda (n)
+        (do ([i 10 (- i 1)] [j 0 (+ j i)])
+            ((zero? i) j))))
+    (sum-all 10)
+    #+END_SRC
+
     
 * 6. Operations on Objects(对象的操作)
   本章描述对象支持的操作，对象包括：
@@ -2193,12 +2296,500 @@ How might the primitive procedure list be-defined?
     读取一个无符号字节(0~255),游标+1
     或读取到eof
     #+BEGIN_SRC scheme
-    (let* ((vec-num (vector 0 1 2 3 4 5 6 7 8 9))
-           [vec-reader (open-bytevector-input-port vec-num)])
-      (display 'hello))
-
+    ;;; 将字节向量读取到列表中，包括!eof
+    (let* ((vec-num #vu8(0 1 2 3 4 5 6 7 8 9))
+           [vec-reader (open-bytevector-input-port vec-num)]
+           [vec-len (bytevector-length vec-num)])
+      (do ([i 0 (+ i 1)] [vals (list) (append vals (list (get-u8 vec-reader)))])
+          ([> i vec-len] vals)))
     #+END_SRC
 
 *** procedure: (lookahead-u8 binary-input-port) 
     returns: the next byte from binary-input-port, or the eof object 
     libraries: (rnrs io ports), (rnrs)
+    
+    如果binary-input-port位于文件末尾，则返回eof对象。
+    否则，下一个可用字节作为无符号8位数返回，即，小于或等于255的精确无符号整数。
+    与get-u8相比，lookahead-u8不消耗它从端口读取的字节，因此如果端口上的下一个操作是对lookahead-u8或get-u8的调用，则返回相同的字节。
+    
+*** procedure: (get-bytevector-n binary-input-port n) 
+    returns: a nonempty bytevector containing up to n bytes, or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+
+    返回字节向量，游标后移n字节或!eof
+
+*** procedure: (get-bytevector-n! binary-input-port bytevector start n) 
+    returns: the count of bytes read or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+
+    如果binary-input-port位于文件末尾，则返回eof对象。否则，get-bytevector-n！读取（就像使用get-u8一样多）字节，最多为n，
+    在端口处于文件结尾之前可用，将字节存储在从start开始的bytevector的连续位置，并返回读取的字节数精确的正整数。端口的位置超过读取的字节数。
+
+*** procedure: (get-bytevector-some binary-input-port) 
+    returns: a nonempty bytevector or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+    如果binary-input-port位于文件末尾，则返回eof对象。
+    否则，get-bytevector-some读取（就像使用get-u8一样）至少一个字节甚至更多，并返回包含这些字节的bytevector。
+    端口的位置超过读取的字节数。此操作读取的最大字节数取决于实现。
+
+*** procedure: (get-bytevector-all binary-input-port) 
+    returns: a nonempty bytevector or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+    如果binary-input-port位于文件末尾，则返回eof对象。
+    否则，get-bytevector-all读取（就像使用get-u8一样）在端口位于文件末尾之前可用的所有字节，
+    并返回包含这些字节的bytevector。端口的位置超过读取的字节数。
+
+*** procedure: (get-char textual-input-port) 
+    returns: the next character from textual-input-port, or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+    
+*** procedure: (lookahead-char textual-input-port) 
+    returns: the next character from textual-input-port, or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+    
+    #+BEGIN_SRC scheme
+    ;;; 读取一个单词
+    (define get-word
+      (lambda (p)
+        (list->string
+          (let f ()
+            (let ([c (lookahead-char p)])
+              (cond
+                [(eof-object? c) '()]
+                [(char-alphabetic? c) (get-char p) (cons c (f))]
+                [else '()]))))))
+    #+END_SRC
+*** procedure: (get-string-n textual-input-port n) 
+    returns: a nonempty string containing up to n characters, or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (get-string-n! textual-input-port string start n) 
+    returns: the count of characters read or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (get-string-all textual-input-port) 
+    returns: a nonempty string or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (get-line textual-input-port) 
+    returns: a string or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+    #+BEGIN_SRC scheme
+    (let ([sip (open-string-input-port "one\ntwo\n")])
+      (let* ([s1 (get-line sip)] [s2 (get-line sip)])
+        (list s1 s2 (port-eof? sip)))) ;; ("one" "two" #t) 
+
+    (let ([sip (open-string-input-port "one\ntwo")])
+      (let* ([s1 (get-line sip)] [s2 (get-line sip)])
+        (list s1 s2 (port-eof? sip)))) ;; ("one" "two" #t)
+    #+END_SRC
+*** procedure: (get-datum textual-input-port) 
+    returns: a Scheme datum object or the eof object 
+    libraries: (rnrs io ports), (rnrs)
+
+    此过程扫描过去的空格和注释，以查找数据外部表示的开始。
+    get-datum根据需要读取多个字符，而不再读取单个数据，并返回一个新分配的对象，其结构由外部表示确定。
+    游标后移读取字节数。
+    如果在完成数据之前到达文件结尾，或者读取了意外字符，则会引发条件类型＆词法和i / o-read的异常。
+    #+BEGIN_SRC scheme
+    ;;; 读取数据
+    (let ([sip (open-string-input-port "; a\n\n one (two)\n")])
+      (let* ([x1 (get-datum sip)]
+             [c1 (lookahead-char sip)]
+             [x2 (get-datum sip)])
+        (list x1 c1 x2 (port-eof? sip)))) ;; (one #\space (two) #f)
+    #+END_SRC
+*** procedure: (port-eof? input-port) 
+    returns: #t if input-port is at end-of-file, #f otherwise 
+    libraries: (rnrs io ports), (rnrs)
+** 7.8.OutputOperations
+   本节描述了主要用于将数据发送到输出端口的过程。
+*** procedure: (put-u8 binary-output-port octet) 
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (put-bytevector binary-output-port bytevector) 
+    procedure: (put-bytevector binary-output-port bytevector start) 
+    procedure: (put-bytevector binary-output-port bytevector start n) 
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (put-char textual-output-port char) 
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (put-string textual-output-port string) 
+    procedure: (put-string textual-output-port string start) 
+    procedure: (put-string textual-output-port string start n) 
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (put-datum textual-output-port obj) 
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (flush-output-port output-port) 
+    returns: unspecified 
+    libraries: (rnrs io ports), (rnrs)
+    此过程强制将与output-port关联的缓冲区中的任何字节或字符立即发送到基础流。
+** 7.9.Convenience I/O
+   可以使用或不使用显式端口参数来调用便利输入/输出过程。
+   如果在没有显式端口参数的情况下调用，则会根据需要使用当前输入或输出端口。
+   例如，（read-char）和（read-char（current-input-port））都返回当前输入端口的下一个字符。
+*** procedure: (open-input-file path) 
+    returns: a new input port 
+    libraries: (rnrs io simple), (rnrs)
+    path必须是一个字符串或一些其他依赖于实现的值来命名文件。 
+    open-input-file为path命名的文件创建一个新的文本输入端口，
+    就像使用带有默认选项的open-file-input-port，依赖于实现的缓冲模式和依赖于实现的转码器一样。
+*** procedure: (open-output-file path) 
+    returns: a new output port 
+    libraries: (rnrs io simple), (rnrs)
+
+    #+BEGIN_SRC scheme
+    ;;; 写文件
+    (let ([p (open-output-file "myfile.ss")])
+      (let f ([ls list-to-be-printed])
+        (if (not (null? ls))
+            (begin
+              (write (car ls) p)
+              (newline p)
+              (f (cdr ls)))))
+      (close-port p))
+
+    ;;; 读文件
+    (let ([port (open-input-file "myfile.ss")])
+      (lef f ([x (read port)])
+           (begin
+             (close-port p)
+             '())
+           (cons x (f (read port)))))
+    #+END_SRC
+*** procedure: (call-with-input-file path procedure) 
+    returns: the values returned by procedure 
+    libraries: (rnrs io simple), (rnrs)
+
+    解耦合文件打开和文件处理；
+    call-with-input-file为path命名的文件创建一个新的输入端口，就像使用open-input-file一样，并将此端口传递给procedure。
+    如果procedure返回，call-with-input-file将关闭输入端口并返回procedure返回的值。
+*** procedure: (call-with-output-file path procedure) 
+    returns: the values returned by procedure 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (with-output-to-file path thunk) 
+    returns: the values returned by thunk 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (read) 
+    procedure: (read textual-input-port) 
+    returns: a Scheme datum object or the eof object 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (read-char) 
+    procedure: (read-char textual-input-port) 
+    returns: the next character from textual-input-port 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (peek-char) 
+    procedure: (peek-char textual-input-port) 
+    returns: the next character from textual-input-port 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (write obj) 
+    procedure: (write obj textual-output-port) 
+    returns: unspecified 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (display obj) 
+    procedure: (display obj textual-output-port) 
+    returns: unspecified 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (write-char char) 
+    procedure: (write-char char textual-output-port) 
+    returns: unspecified 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (newline) 
+    procedure: (newline textual-output-port) 
+    returns: unspecified 
+    libraries: (rnrs io simple), (rnrs)
+*** procedure: (close-input-port input-port) 
+    procedure: (close-output-port output-port) 
+    returns: unspecified 
+    libraries: (rnrs io simple), (rnrs)
+** 7.10.FilesystemOperations
+*** procedure: (file-exists? path)
+   returns: #t if the file named by path exists, #f otherwise 
+   libraries: (rnrs files), (rnrs)
+*** procedure: (delete-file path) 
+    returns: unspecified 
+    libraries: (rnrs files), (rnrs)
+** 7.11.ByteVector/String Conversions
+*** procedure: (bytevector->string bytevector transcoder) 
+    returns: a string containing the characters encoded in bytevector 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (string->bytevector string transcoder) 
+    returns: a bytevector containing the encodings of the characters in string 
+    libraries: (rnrs io ports), (rnrs)
+*** procedure: (string->utf8 string) 
+    returns: a bytevector containing the UTF-8 encoding of string 
+    libraries: (rnrs bytevectors), (rnrs)
+    
+    procedure: (string->utf16 string) 
+    procedure: (string->utf16 string endianness) 
+    procedure: (string->utf32 string) 
+    procedure: (string->utf32 string endianness) 
+*** procedure: (utf8->string bytevector) 
+    returns: a string containing the UTF-8 decoding of bytevector 
+    libraries: (rnrs bytevectors), (rnrs)
+
+    procedure: (utf16->string bytevector endianness) 
+    procedure: (utf16->string bytevector endianness endianness-mandatory?) 
+    procedure: (utf32->string bytevector endianness) 
+    procedure: (utf32->string bytevector endianness endianness-mandatory?) 
+    returns: a string containing the specified decoding of bytevector 
+    libraries: (rnrs bytevectors), (rnrs)
+* 8. Syntatic Extension
+** introduce
+   语法扩展或宏用于简化和规范程序中的重复模式，
+   使用新的计算规则引入语法形式，并执行有助于提高程序效率的转换。
+
+   语法扩展通常采用形式(keyword subform...），其中keyword是命名语法扩展的标识符。
+   每个subform描述从一个语法扩展到另外一个。
+   语法扩展可以采用非常规列表或单个标识符
+   
+   通过将关键字与转换过程或变换器相关联来定义新的语法扩展。
+   使用define-syntax形式或使用let-syntax或letrec-syntax定义语法扩展。
+   使用syntax-rules创建转化器，这允许执行简单的基于模式的转换。
+   它们也可以是接受一个参数并执行任意计算的普通过程。syntax-case ,syntax
+   identifier-syntax,make-variable-transformer,syntax-rules.
+
+   语法扩展器(syntax expander)在计算开始时（编译或解释之前）将语法扩展扩展为核心形式。
+   如果扩展器遇到语法扩展，它调用相关的变换器来扩展语法扩展，
+   如果扩展器遇到核心语法形式,它递归处理子form（如果有），并从展开的subform重构表单。
+   在扩展期间维护有关标识符绑定的信息，以强制执行变量和关键字的词法作用域。
+
+   可从 http://www.cs.indiana.edu/syntax-case/ 获得该系统的便携式实现，该系统还支持库和顶级程序。
+** 8.1.Keyword Binding
+   本节介绍在关键字和变换器之间建立绑定的forms。
+   可以使用define-syntax在top-level或库主体中建立关键字绑定，
+   并使用define-syntax，let-syntax或letrec-syntax在任何本地范围内建立关键字绑定。
+*** syntax: (define-syntax keyword expr) 
+    libraries: (rnrs base), (rnrs)
+    
+    expr must evaluate to a transformer(转换器).
+    #+BEGIN_SRC scheme
+    ;;; 等以let*语法扩展
+    ;;; step1. 调用define-syntax let* 关键字
+    (define-syntax let*
+      ;;; step2. 创建转换规则
+      (syntax-rules ()
+        [(_ () b1 b2 ...) (let () b1 b2 ...)]
+        [(_ ([i1 e1] [i2 e2] ...) b1 b2...)
+         (let ([i1 e1])
+           ;;; 注意，递归调用自身
+           (let* ([i2 e2] ...) b1 b2 ...))]))
+    #+END_SRC
+
+    所有绑定都由一组内部定义建立，关键字或变量定义在直接封闭体内的任何地方都可见，包括在定义本身内。
+    
+    #+BEGIN_SRC scheme
+    (let ()
+      ;;; 内部可见odd?
+      (define even?
+        (lambda (x)
+          (or (= x 0) (odd? (- x 1)))))
+      ;;; 内部可见even?
+      (define-syntax odd?
+        (syntax-rules ()
+          [(_ x) (not (even? x))]))
+      (even? 10))
+    #+END_SRC
+
+    扩展器(expander)在library,lambda,other body中从左到由的处理初始forms。
+    如果遇到变量定义，它会记录定义的标识符是变量但延迟右侧表达式的扩展直到处理完所有定义之后的事实。
+    如果遇到关键字定义，它会扩展并评估右侧表达式，并将关键字绑定到生成的转换器。
+    如果遇到表达式，它会完全展开所有延迟的右侧表达式以及当前和剩余的正文表达式。
+
+    从左到右处理顺序的含义是一个内部定义可以影响后续forms是否也是一个定义。
+
+    #+BEGIN_SRC scheme
+    (let ()
+      (define-syntax bind-to-zero
+        (syntax-rules ()
+          [(_ id) (define id 0)]))
+      (bind-to-zero x)
+      x)
+    #+END_SRC
+*** syntax: (let-syntax ((keyword expr) ...) form1 form2 ...) 
+    syntax: (letrec-syntax ((keyword expr) ...) form1 form2 ...) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+
+    每个expr必须是一个转换器。
+    对于let-syntax和letrec-syntax两者，每个关键字都绑定在form1 form2 ....对于letrec-syntax，绑定范围还包括每个expr。
+
+    以下示例重点介绍let-syntax和letrec-syntax的区别。
+    #+BEGIN_SRC scheme
+    (let ([f (lambda (x) (+ x 1))])
+      (let-syntax ([f (syntax-rules ()
+                           [(_ x) x])]
+                   [g (syntax-rules ()
+                        ;;;此处 f 绑定到 variable f,即(lambda ...)
+                           [(_ x) (f x)])])
+        (list (f 1) (g 1)))) ;; (1 2) 
+
+    (let ([f (lambda (x) (+ x 1))])
+      (letrec-syntax ([f (syntax-rules ()
+                           [(_ x) x])]
+                      [g (syntax-rules ()
+                           ;;; 此处f绑定到 kewword f,即(syntax-rules ()...
+                           [(_ x) (f x)])])
+        (list (f 1) (g 1)))) ;; (1 1)
+    #+END_SRC
+** 8.2.Syntax-Rules Transformers
+   本节中描述的syntax-rules允许以方便的方式指定简单的变换器(transformers)。
+   可以使用这些机制(8.1 define-syntax,let-syntax,letrec-syntax)将这些变换器绑定到关键字。
+   虽然表现力较差,不如8.3，它足以定义许多常见的语法扩展。
+*** syntax: (syntax-rules (literal ...) clause ...) 
+    returns: a transformer 
+    libraries: (rnrs base), (rnrs)
+    
+    每个文字(literal)必须是下划线（_）或省略号（...）以外的标识符。
+    每个条款(clause)必须采用以下形式。
+    (pattern template)
+    - pattern 模式
+      模式由列表结构，向量结构，标识符和常量组成。
+      模式中的每个标识符都是文字，模式变量，下划线或省略号。
+      文字用作辅助关键字，例如case和cond表达式中的else。
+      模式中的列表和向量结构指定输入所需的基本结构，
+      下划线和模式变量指定任意子结构，
+      文字和常量指定必须精确匹配的原子片段。
+      省略号指定它们遵循的子模式的重复出现。
+
+      输入形式F与模式P匹配，当且仅当：
+      P是下划线或模式变量，
+      P是文字标识符，F是具有相同绑定的标识符，由谓词free-identifier =？确定。
+      P的形式为（P1 ... Pn），F是与P1到Pn匹配的n个元素的列表，
+      
+      语法规则模式的最外层结构实际上必须是上面列表结构形式之一，
+    - template 模板
+      模板是 模式变量，不是模式变量的标识符，模式数据，子模板列表（S1 ... Sn），非常规的子模板列表（S1 S2 ... Sn.T），
+             子模板＃（S1 ... Sn）的矢量。
+   
+    #+BEGIN_SRC scheme
+    (define-syntax or
+      (syntax-rules ()
+        [(_) #f]
+        [(_ e) e]
+        [(_ e1 e2 e3 ...)
+         ;;;引入临时变量t，为了防止重复计算e1
+         ;;; t 和 if 只在 or 词法范围有效，不影响外部的 t,if
+         (let ([t e1]) (if t t (or e2 e3 ...)))]))
+
+    ;;; 外部重定义 if, t 不影响 or 内部的 if,t
+    ;;; or内部的if，t被妥善处理
+    (let ([if #f])
+      (let ([t 'okay])
+        (or if t))) ;; okay
+    #+END_SRC
+
+    扩展器算法(expansion algorithm)会自动重命名本地标识符，以维护(lexical scoping)词法范围.
+
+    #+BEGIN_SRC scheme
+    ;;; 带参数 else
+    ;;; 简单版本的cond
+    (define-syntax cond
+      (syntax-rules (else)
+        [(_ (else e1 e2 ...)) (begin e1 e2 ...)]
+        [(_ (e0 e1 e2 ...)) (if e0 (begin e1 e2 ...))]
+        [(_ (e0 e1 e2 ...) c1 c2 ...)
+         (if e0 (begin e1 e2 ...) (cond c1 c2 ...))]))
+    #+END_SRC
+
+*** syntax: _ 
+    syntax: ... 
+    libraries: (rnrs base), (rnrs syntax-case), (rnrs)
+    
+    _, ... 是 syntax-rules,identifier-syntax,syntax-case的辅助关键字
+    ... 还是 syntax，quasisyntax的辅助关键字
+
+*** syntax: (identifier-syntax tmpl) 
+    syntax: (identifier-syntax (id1 tmpl1) ((set! id2 e2) tmpl2)) 
+    returns: a transformer 
+    libraries: (rnrs base), (rnrs)
+    
+    当关键字绑定到由第一种形式的identifier-syntax生成的转换器时，
+    绑定范围内对关键字的引用将替换为tmpl。
+    
+    #+BEGIN_SRC scheme
+    ;;; 相当于 别名
+    (let ()
+      (define-syntax a (identifier-syntax car))
+      (list (a '(1 2 3)) a)) ;; (1 #<procedure>)
+
+    (let ([ls (list 0)])
+      (define-syntax a
+        (identifier-syntax
+          [id (car ls)]
+          [(set! id e) (set-car! ls e)]))
+      (let ([before a])
+        (set! a 1)
+        (list before a ls))) ;; (0 1 (1))
+    #+END_SRC
+
+** 8.3.Syntax-Case Transformers
+   Syntax-Case 转换器
+   本节描述了一种更具表现力的创建transformers的机制，syntax-case 是 syntax-rules的更通用版本。
+   该机制允许指定任意复杂的变换器，包括控制“弯曲”词汇范围的转换，允许定义更广泛的语法扩展类。
+   任何syntax-rules定义的转换器，都可以被syntax-case重写。甚至syntax-rules自身都是有syntax-case定义的。
+
+   通过这种机制，变换器是一个参数的过程。参数是表示要处理的form的syntax object.返回值是表示输出form的syntax object。
+   syntax object 是如下几种可能：非配对，非向量，非符号值，一对语法对象，语法对象的向量，或一个包装的语法对象。
+
+   - 包装语法对象：包含其结构外还包含了form的上下文信息。扩展器使用此上下文信息来维护词法范围。
+     包装还可能包含实现用于关联源代码和目标代码的信息，例如，通过扩展和编译过程跟踪文件，行和字符信息。
+     必须为所有标识符提供上下文信息，这就是为什么上面的语法对象的定义不允许符号，除非它们被包装。
+     表示标识符的语法对象本身称为标识符;
+     术语标识符(idntifier)可以指语法实体（符号，变量或关键字）或语法实体的具体表示作为语法对象。
+*** syntax: (syntax-case expr (literal ...) clause ...) 
+    returns: see below 
+    libraries: (rnrs syntax-case), (rnrs)
+   
+    每个literal必须是标识符。每个clause必须采用以下两种形式之一。
+    
+    (pattern output-expression)
+    (pattern fender output-expression)
+
+    syntax-case pattern 可以是第8.2节中描述的任何形式。
+    
+    ...
+** 8.4.Examples
+   
+* 9. Records
+  本章描述了程序员定义新数据类型或记录类型的方法，每种类型都与所有其他类型不同。
+  记录通过define-record-type form或make-record-type-descriptor procedure定义。
+  
+** 9.1.Define Records
+   - define-record-type 定义一个记录类型，以及其构造过程，类型谓词，字段访问过程，字段赋值过程。
+   - mutable 声明字段可变
+   - immutable 声明字段不可变(默认不可变)
+   - 可以自定义相关过程名称
+   #+BEGIN_SRC scheme
+   ;;; 定义一个点类型
+   ;;;  具有2个字段 x, y;
+   (define-record-type point (fields x y))
+   ;;; define-record-type 自动定义出以下过程
+   ;;; (make-point x y) constructor
+   ;;; (point? obj)     predicate
+   ;;; (point-x p)      accessor for field x
+   ;;; (point-y p)      accessor for field y
+
+   (define p (make-point 36 -17))
+   (point? p) ;; #t
+   (point? '(cons 36 -17)) ;; #f
+   (point-x p) ;; 36
+   (point-y p) ;; -17
+
+   ;;; 默认字段值是不可变的(immutable)
+   ;;; 要改变字段值需要将字段声明为可变(multable)
+   (define-record-type point (fields (mutable x) y))
+   ;;; 声明为mutable后，会增加一个改变x值的过程(mutator)
+   ;;; (point-x-set! p x)
+   (define p (make-point 36 -17))
+   (point-x-set! p (- (point-x p) 12))
+   (point-x p) ;; 24
+
+   ;;; 为清楚起见，可以明确声明字段是不可变的(immutable);
+   (define-record-type point (fields (mutable x) (immutable y)))
+
+   ;;; 自定义相关操作过程
+   (define-record-type (point mkpoint ispoint?)
+     (fields (mutable x x-val set-x-val!)
+             (immutable y y-val)))
+   #+END_SRC
