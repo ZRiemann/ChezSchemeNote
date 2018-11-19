@@ -2760,6 +2760,17 @@ How might the primitive procedure list be-defined?
    - mutable 声明字段可变
    - immutable 声明字段不可变(默认不可变)
    - 可以自定义相关过程名称
+   - (generative默认)相同代码每次调用define-record-type 都将产生新的记录类型
+   - (nongenerative) 相同代码每次调用define-recorde-type 在相同词法域不产生新类型
+     在不同词法域产生不同类型，但可以使用(nongenerative same-user-id)来指定不同词法域的相同类型
+     但是鼓励程序员从RFC 4122 UUID名称空间[20]中选择uid，可能使用记录类型名称作为前缀。
+   - 支持父记录类型，子记录类型；(继承)
+   - (protocol) 使用protocol实现字段赋值程序化，不需要每个字段都手动赋值
+     父类的存在导致更复杂的情况，
+     (lambda (pargs->new)
+      (lambda (x1 ... xn y1 ... ym)
+       ((pargs->new x1 ... xn) y1 ... ym)))
+     
    #+BEGIN_SRC scheme
    ;;; 定义一个点类型
    ;;;  具有2个字段 x, y;
@@ -2788,8 +2799,482 @@ How might the primitive procedure list be-defined?
    ;;; 为清楚起见，可以明确声明字段是不可变的(immutable);
    (define-record-type point (fields (mutable x) (immutable y)))
 
-   ;;; 自定义相关操作过程
+   ;;; 自定义相关过程标识符，构造器、谓词、访问器、存取器
+   ;;;                      structtor predate
    (define-record-type (point mkpoint ispoint?)
+     ;;                accessor mutators
      (fields (mutable x x-val set-x-val!)
              (immutable y y-val)))
+
+   ;;; 嵌套调用，注意内部f生成的p,和外部f比较的point?不是一个类型
+   ;;; 每次调用define-record-type 都将生成新的类型定义，即便是一样的内容
+   ;;; 
+   (define (f p)
+     (define-record-type point (fields x y))
+     (if (eq? p 'make) (make-point 3 4) (point? p)))
+   (f (f 'make)) ;; #f
+   ;; 注意后缀的不同， *-1，*-2，*-3，*-4说明调研了4次define-record-type
+   ;; 不同生成器生成的point是不同的类型
+   ;;> #[#{point ha8e477qifvlwrgqvn81cukto-1} 3 4]
+   ;;> #[#{point ha8e477qifvlwrgqvn81cukto-2} 3 4]
+   ;;> #[#{point ha8e477qifvlwrgqvn81cukto-3} 3 4]
+   ;;> #[#{point ha8e477qifvlwrgqvn81cukto-4} 3 4]
+
+   ;;; nongenerative 与 fields 顺序可以调换
+   ;;; 不产生新定义类型
+   (define (f p)
+     (define-record-type point (fields x y) (nongenerative))
+     (if (eq? p 'make) (make-point 3 4) (point? p)))
+   (define p (f 'make))
+   (f p) ;; #t
+
+   ;;; 在不同的词法域内，即便使用(nongenerative)，也是不同的类型定义
+   (define (f)
+     (define-record-type point (fields x y) (nongenerative))
+     (make-point 3 4))
+   (define (g p)
+     (define-record-type point (fields x y) (nongenerative))
+     (point? p))
+   (g (f)) ;; #f
+
+   ;;; 使用(nongenerative <user-id>)来指定不同词法域的相同记录类型
+   (define (f)
+     (define-record-type point (fields x y)
+       (nongenerative really-the-same-point))
+     (make-point 3 4))
+   (define (g p)
+     (define-record-type point (fields x y)
+       (nongenerative really-the-same-point))
+     (point? p))
+   (g (f)) ;; #t
+   (f)     ;; #[really-the-same-point 3 4] 使用用户自定义记录名称
+
+   ;;; 父子类型
+   ;;; 继承
+   (define-record-type point (fields x y))
+   (define-record-type cpoint (parent point) (fields color)) ;;; 带颜色的点
+   ;;(define-record-type car (fields color))
+   ;;(define-record-type point-car (parent point) (parent car) (fields title)) 不支持多继承
+   (define aaa
+     (make-cpoint 3 4 'red))
+   aaa
+   (point? aaa)    ;; #t 子类实例是父类型
+   (cpoint? aaa)   ;; #t
+   (point-x aaa)   ;; 3
+   ;; (cpoint-x aaa) 注意不存在cpoint-x,子类不会重复定义父类的访问器
+   (cpoint-color aaa) ;; 子类只是增加新的访问器(方法)
+
+   ;;--------------------------------------------------------------------------------
+   ;; protocol 协议赋值
+   ;; 
+   (define-record-type point
+     (fields x y d)
+     (protocol
+      ;;;原始构造器接收x,y,d三参数
+      (lambda (new)
+        ;;; 新构造器接受2参数
+         (lambda (x y)
+           (new x y (sqrt (+ (* x x) (* y y)))))))) 
+
+   (define p (make-point 3 4))
+   (point-x p) ;; 3
+   (point-y p) ;; 4
+   (point-d p) ;; 5
+
+   ;;; 带继承的情况
+   (define-record-type cpoint
+     (parent point)
+     (fields color)
+     (protocol
+       (lambda (pargs->new)
+         (lambda (c x y)
+           ((pargs->new x y) c))))) 
+
+   (define cp (make-cpoint 'red 3 4))
+   (point-x cp) ;; 3
+   (point-y cp) ;; 4
+   (point-d cp) ;; 5
+   (cpoint-color cp) ;; red
    #+END_SRC
+   
+*** syntax: (define-record-type record-name clause ...) 
+    syntax: (define-record-type (record-name constructor pred) clause ...) 
+    libraries: (rnrs records syntactic), (rnrs)
+    
+    记录定义，以<record-name>作为标识符，包含：谓词、构造器、访问器、存取器(mutator)；
+
+*** Fields clause(字段条款)
+    - (fields field-spec ...)
+    - fields-spec
+      field-name
+      (immmutable field-name)
+      (mutable field-name)
+      (immmutable field-name accessor-name)
+      (mutable field-name accessor-name mutator-name)
+      
+      default-accessor-name = <record-name>-<field-name>
+      default-mutator-name = <record-name>-<field-name>-set!
+*** Parent clause(父记录条款)
+    (parent parent-name)
+    父记录必须已申明(previoisly defined via define-record-type)非封闭(non-sealed)
+    子记录属于父记录，但增加自己的内容。(子记录是父记录的超集)
+*** Nongenerative clause(不新增定义条款)
+    (generative)        ;; 保证每次调用均生成不同的uid，
+    (nongenerative)     ;; 词法域内自定义uid，保证词法域内一致
+    (nongenerative uid) ;; 全局定义记录uid，保证全局一致
+*** Protocol clause(协议条款)
+    - (protocol expression)
+    - expression:
+      计算结果是一个过程
+*** Sealed clause(封闭条款)
+    (seled #t)：指定记录不能扩展(不能作为父记录被继承)，不能被make-record-type-descriptor调用。
+*** Opaque clause(不透明条款)
+    (parent-rtd parent-rtd parent-rcd) 
+    主要用途：当通过调用make-record-type-descriptor和make-record-constructor-descriptor获得父rtd和rcd。
+*** 辅助句法关键字
+    syntax: fields 
+    syntax: mutable 
+    syntax: immutable 
+    syntax: parent 
+    syntax: protocol 
+    syntax: sealed 
+    syntax: opaque 
+    syntax: nongenerative 
+    syntax: parent-rtd 
+    libraries: (rnrs records syntactic), (rnrs)
+** 9.2.Procedural Interface
+   make-record-type-descriptor 创建更灵活的记录类型语法接口。
+*** procedure: (make-record-type-descriptor name parent uid s? o? fields) 
+    returns: a record-type descriptor (rtd) for a new or existing record type 
+    libraries: (rnrs records procedural), (rnrs)
+    
+    #+BEGIN_SRC scheme
+    (define point-rtd
+      (make-record-type-descriptor 'point #f #f #f #f
+                                   '#((mutable x) (immutable y))))
+    (define point-rcd
+      (make-record-constructor-descriptor point-rtd
+                                          #f #f))
+    (define make-point (record-constructor point-rcd))
+    (define point? (record-predicate point-rtd))
+    (define point-x (record-accessor point-rtd 0))
+    (define point-y (record-accessor point-rtd 1))
+    (define point-x-set! (record-mutator point-rtd 0))
+
+    ;; ...
+    #+END_SRC
+
+* 10. Libraries and Top-Level
+  库使用带括号的语法命名，该语法包含一系列标识符，可选地后跟一个版本;
+  实现通常将名称序列视为可以找到库的源代码或目标代码的路径，可能根源于主机文件系统中的某些标准位置集。
+  
+** 10.1.Standard Libraries
+  #+BEGIN_SRC scheme
+  (rnrs base (6))
+  (rnrs arithmetic bitwise (6))
+  (rnrs arithmetic fixnums (6))
+  (rnrs arithmetic flonums (6))
+  (rnrs bytevectors (6))
+  (rnrs conditions (6))
+  (rnrs control (6))
+  (rnrs enums (6))
+  (rnrs eval (6))
+  (rnrs exceptions (6))
+  (rnrs files (6))
+  (rnrs hashtables (6))
+  (rnrs io ports (6))
+  (rnrs io simple (6))
+  (rnrs lists (6))
+  (rnrs mutable-pairs (6))
+  (rnrs mutable-strings (6))
+  (rnrs programs (6))
+  (rnrs r5rs (6))
+  (rnrs records procedural (6))
+  (rnrs records syntactic (6))
+  (rnrs records inspection (6))
+  (rnrs sorting (6))
+  (rnrs syntax-case (6))
+  (rnrs unicode (6))
+  #+END_SRC
+
+** 10.2.Define New Libraryes
+   
+*** define liarary form syntax
+    #+BEGIN_SRC scheme
+    ;;; 自定义库
+    (library library-name
+      (export export-spec ...) ;; 导出库
+      (import import-spec ...) ;; 导入库
+      library-body)
+
+    ;;; 定位库路径
+    (identifier identifier ...)
+    (identifier identifier ... version)
+
+    (subversion ...)
+
+    (list-tools setops) ;; = (list-tools setops ())
+    (list-tools setops (1 2)) ;; = version 1.2
+
+    ;;; export-spec
+    identifier ;; internal-name == export-name
+    (rename (internal-name export-name) ...)
+
+    ;;; import-spec
+    import-set
+    (for import-set import-level ...)
+    ;;; import-level, level 是正整数
+    run
+    expand
+    (meta level)
+
+    library-spec
+    (only import-set identifier ...)
+    (except import-set identifier ...)
+    (prefix import-set prefix)
+    (rename import-set (import-name internal-name) ...)
+
+    (prefix
+      (only
+        (rename (list-tools setops) (difference diff))
+        union
+        diff)
+      set:)
+    #+END_SRC
+
+*** 10.3.Top-Level Programs
+    顶级程序本身不是语法形式，而是一组通常仅由文件边界分隔的forms。
+    顶级程序可以被认为是没有库包装器的库forms;
+    (import import-spec ...)
+    definition-or-expression
+    ...
+   
+   
+**** procedure: (command-line) 
+     returns: a list of strings representing command-line arguments 
+     libraries: (rnrs programs), (rnrs)
+     
+   #+BEGIN_SRC scheme
+   ;;; 获取程序输入参数
+   (command-line)
+   #+END_SRC
+
+**** procedure: (exit) 
+     procedure: (exit obj) 
+     returns: does not return 
+     libraries: (rnrs programs), (rnrs)
+     
+     退出程序，回到超作系统
+     
+** 10.4.Examples
+   #+BEGIN_SRC scheme
+   ;;; 自定义 list-tools setops v.1 库
+   (library (list-tools setops (1))
+     (export set empty-set empty-set? list->set set->list
+             union intersection difference member?)
+     (import (rnrs base) (only (rnrs lists) member)) 
+
+     (define-syntax set
+       (syntax-rules ()
+         [(_ x ...)
+          (list->set (list x ...))])) 
+
+     (define empty-set '()) 
+
+     (define empty-set? null?) 
+
+     (define list->set
+       (lambda (ls)
+         (cond
+           [(null? ls) '()]
+           [(member (car ls) (cdr ls)) (list->set (cdr ls))]
+           [else (cons (car ls) (list->set (cdr ls)))]))) 
+
+     (define set->list (lambda (set) set)) 
+
+     (define u-d-help
+       (lambda (s1 s2 ans)
+         (let f ([s1 s1])
+           (cond
+             [(null? s1) ans]
+             [(member? (car s1) s2) (f (cdr s1))]
+             [else (cons (car s1) (f (cdr s1)))])))) 
+
+     (define union
+       (lambda (s1 s2)
+         (u-d-help s1 s2 s2))) 
+
+     (define intersection
+       (lambda (s1 s2)
+         (cond
+           [(null? s1) '()]
+           [(member? (car s1) s2)
+            (cons (car s1) (intersection (cdr s1) s2))]
+           [else (intersection (cdr s1) s2)]))) 
+
+     (define difference
+       (lambda (s1 s2)
+         (u-d-help s1 s2 '()))) 
+
+     (define member-help?
+       (lambda (x s)
+         (and (member x s) #t))) 
+
+     (define-syntax member?
+       (syntax-rules ()
+         [(_ elt-expr set-expr)
+          (let ([x elt-expr] [s set-expr])
+            (and (not (null? s)) (member-help? x s)))])))
+
+   (library (more-setops)
+     (export quoted-set set-cons set-remove)
+     (import (list-tools setops) (rnrs base) (rnrs syntax-case)) 
+
+     (define-syntax quoted-set
+       (lambda (x)
+         (syntax-case x ()
+           [(k elt ...)
+            #`(quote
+                #,(datum->syntax #'k
+                    (list->set
+                      (syntax->datum #'(elt ...)))))]))) 
+
+     (define set-cons
+       (lambda (opt optset)
+         (union (set opt) optset))) 
+
+     (define set-remove
+       (lambda (opt optset)
+         (difference optset (set opt)))))
+
+
+   (import
+     (for (list-tools setops) expand run)
+     (for (rnrs base) expand run)
+     (for (rnrs syntax-case) expand))
+
+   (import (list-tools setops) (more-setops) (rnrs))
+   (define-syntax pr
+     (syntax-rules () 
+       [(_ obj)
+        (begin
+          (write 'obj)
+          (display " ;=> ")
+          (write obj)
+          (newline))]))
+   (define get-set1
+     (lambda ()
+       (quoted-set a b c d)))
+   (define set1 (get-set1))
+   (define set2 (quoted-set a c e)) 
+
+   (pr (list set1 set2))
+   (pr (eq? (get-set1) (get-set1)))
+   (pr (eq? (get-set1) (set 'a 'b 'c 'd)))
+   (pr (union set1 set2))
+   (pr (intersection set1 set2))
+   (pr (difference set1 set2))
+   (pr (set-cons 'a set2))
+   (pr (set-cons 'b set2))
+   (pr (set-remove 'a set2))
+   #+END_SRC
+
+* 11. Exceptions and Conditions
+  异常和信号为系统和用户代码提供了，发送信号，检测，错误恢复的方法。
+  - 异常由标准语法抛出
+  - 异常由用户通过(raise,raise-continuable)抛出
+  - current exception handler 处理所有异常，默认异常处理是打印异常，退出程序；
+  - 用户代码可以通过guard语法或with-exception-handler过程建立新的当前异常处理程序。
+    异常处理链。
+** 11.1.Raising and Handling Exceptions
+*** procedure: (raise obj) 
+    procedure: (raise-continuable obj) 
+    returns: see below 
+    libraries: (rnrs exceptions), (rnrs)
+    
+    异常处理程序可以返回（具有零个或多个值）继续可持续异常(continuable)。
+    但是，如果异常处理程序尝试返回到非可持续异常的延续，则会引发具有条件类型和不可持续性的新异常。
+    #+BEGIN_SRC scheme
+    (raise
+      (condition
+        (make-error)
+        (make-message-condition "no go"))) ;;=> error: no go
+    (raise-continuable
+      (condition
+        (make-violation)
+        (make-message-condition "oops"))) ;;=> violation: oops
+    (list
+      (call/cc
+        (lambda (k)
+          (vector
+            (with-exception-handler
+              (lambda (x) (k (+ x 5)))
+              (lambda () (+ (raise 17) 8))))))) ;;=> (22)
+    (list
+      (vector
+        (with-exception-handler
+          (lambda (x) (+ x 5))
+          (lambda () (+ (raise-continuable 17) 8))))) ;;=> (#(30))
+    (list
+      (vector
+        (with-exception-handler
+          (lambda (x) (+ x 5))
+          (lambda () (+ (raise 17) 8))))) ;;=> violation: non-continuable
+
+    #+END_SRC
+*** procedure: (error who msg irritant ...) 
+    procedure: (assertion-violation who msg irritant ...) 
+    libraries: (rnrs base), (rnrs)
+*** syntax: (assert expression) 
+    returns: see below 
+    libraries: (rnrs base), (rnrs)
+*** procedure: (syntax-violation who msg form) 
+    procedure: (syntax-violation who msg form subform) 
+    returns: does not return 
+    libraries: (rnrs syntax-case), (rnrs)
+*** procedure: (with-exception-handler procedure thunk) 
+    returns: see below 
+    libraries: (rnrs exceptions), (rnrs)
+
+    #+BEGIN_SRC scheme
+    (define (try thunk)
+      (call/cc
+        (lambda (k)
+          (with-exception-handler
+            (lambda (x) (if (error? x) (k #f) (raise x)))
+            thunk))))
+    (try (lambda () 17)) ;;=> 17
+    (try (lambda () (raise (make-error)))) ;;=> #f
+    (try (lambda () (raise (make-violation)))) ;;=> violation
+    (with-exception-handler
+      (lambda (x)
+        (raise
+          (apply condition
+            (make-message-condition "oops")
+            (simple-conditions x))))
+      (lambda ()
+        (try (lambda () (raise (make-violation)))))) ;;=> violation: oops
+    #+END_SRC
+*** syntax: (guard (var clause1 clause2 ...) b1 b2 ...) 
+    returns: see below 
+    libraries: (rnrs exceptions), (rnrs)
+
+    #+BEGIN_SRC scheme
+    (guard (x [else x]) (raise "oops")) ;;=> "oops"
+    (guard (x [#f #f]) (raise (make-error))) ;;=>  error
+    (define-syntax try
+      (syntax-rules ()
+        [(_ e1 e2 ...)
+         (guard (x [(error? x) #f]) e1 e2 ...)]))
+    (define open-one
+      (lambda fn*
+        (let loop ([ls fn*])
+          (if (null? ls)
+              (error 'open-one "all open attempts failed" fn*)
+              (or (try (open-input-file (car ls)))
+                  (loop (cdr ls)))))))
+    ; say bar.ss exists but not foo.ss:
+    (open-one "foo.ss" "bar.ss") ;;=> #<input port bar.ss>
+    #+END_SRC
+** 11.2.Defining Condition Types
+   虽然程序可以传递raise或raise-continuable任何Scheme值，但描述异常情况的最佳方法通常是创建并传递条件对象。

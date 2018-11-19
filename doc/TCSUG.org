@@ -73,11 +73,16 @@ Copyright 1984-2017 Cisco Systems, Inc.
 (a b c d)
 > 
 
+ - 如何退出交互程序 ： *CTL-d* *(exit)*
+ - 终止程序进入debug模式： *CTL-c*
+   break> ["e"|"r"|"a"|"n"|"i"|"s"|"?"]
+
 使用 --script --program 命令行选项，debug-on-exception --debug-on-exception
 Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
 *(load "source/code/path.ss") 加载源文件*
 *(compile-file "source/code/path.ss") 编译源文件得到path.so*
-加载预编译文件本质上和加载源文件相同，但加载*path.so*更快。
+加载预编译文件本质上和加载源文件相同，但加载 *path.so* 更快。
+
 *echo '(compile-file "path/file.ss")' | scheme -q*
 *echo '(reset-handler abort) (compile-file "path/file.ss")' | scheme -q*
 ** 2.Expression Editor(表达式编辑器)
@@ -177,10 +182,10 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
    扩展器(expander)优先加载最新的对象文件
    *compile-imported-libraries*
    *compile-file(#!chezscheme)/compile-library(隐含#!r6rs)*
-   *import-notify #t*
+   *import-notify #t* 可以通过将参数import-notify设置为#t来监视扩展器在处理尚未加载的库的导入时使用的搜索过程。
    *echo '(compile-library "filename")' | scheme -q*
 
-   *load-program(self-contained) | load(顶层域)* 加载程序
+   *load-program(self-contained效率更高) | load(顶层域)* 加载程序
    *compile-program*
    *echo '(compile-program "filename")' | scheme -q*
    *revisit*
@@ -264,7 +269,7 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
    通过cat / copy 命令将多个对象文件组成一个文件
    compile-whole-program 
 ** 9.Command-Line Options
-* Debugging(调试)
+* 3.Debugging(调试)
 ** Tracing
    all libraries: (chezscheme)
    *(trace-lambda name formals body1 body2 ...)*
