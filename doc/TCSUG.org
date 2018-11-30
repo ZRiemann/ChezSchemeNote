@@ -547,8 +547,10 @@ Scheme 引入C接口
 ;; #t
 #+END_SRC
 ** 3.Calling into Scheme
-   *(foreign-callable [conv] proc-exp (param-type ...) res-type)  is-syntax*
+   *(foreign-callable conv ... proc-exp (param-type ...) res-type)  is-syntax*
    return: a code object
+   - proc-exp
+     a procedure is to be invoked by foreign code.
 ** 4.Continuations and Foreign Calls
 ** 5.Foreign Data
    *(foreign-alloc)*
