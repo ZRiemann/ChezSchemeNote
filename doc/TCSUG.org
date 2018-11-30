@@ -172,6 +172,7 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
 (let () (import (only (A) a)) (a aux-a))
 #+END_SRC
 ** 4.Using Libraries and Top-Level Programs(库与顶层程序)
+*** summary
    *load/load-library* 显式加载 *重定义* 已定义的库
    *import* 隐式加载 *不重载* 已定义的库，库文件必须位于同目录下；
    *library-directories* 库搜索路径
@@ -189,6 +190,62 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
    *compile-program*
    *echo '(compile-program "filename")' | scheme -q*
    *revisit*
+*** R6RS library
+    - 可直接在REPL中定义（允许redefine）
+    - 使用 *load-library,load* 显式直接从文件导入,（允许redefine）
+    - 使用 *import* 瘾式从文件导入，不允许重新载入(reloads)
+      (tool sorting) => <search-dirs>/tools/sorting.[so|ss|sls]
+      + (library-directories) => <search-dirs>
+        return: list of pairs of strings(返回字符串对)
+        values: ((<source-file-base-dir> . <object-file-base-dir>) ...)
+                (("." . ".") ("~/lib/scheme" . "~/lib/scheme"))
+      + (library-extensions) => [so|ss|sls|...]
+        return: list of pairs of stirngs
+        values: ((<source-file-extension> . <object-file-extension) ...)
+                (("ss" . "so") ("sls" . "so") ...)
+    - 查找加载流程
+      1. 例子
+        (import (tools sorting))
+        (library-directories) ;;=> /usr/lib/scheme/libraries, .
+        (library-extensions)  ;;=> ss
+         查找范围
+         /usr/lib/scheme/libraries/tools/sorting.ss
+         /usr/lib/scheme/libraries/tools/sorting.sls
+         ./tools/sorting.ss
+         ./tools/sorting.sls
+      2. 构造部分名称, (tools sorting) ==> tools/sorting
+      3. 在(library-directories)中查找对于的 <search-dir>/tools/sorting
+      4. 尝试所有的扩展名 <search-dir>/tools/sorting.<extensions>
+         #+BEGIN_SRC scheme
+         (import-notify #t) ;; 设置搜索路径监视 --import-notify
+         ;;; 库文件搜索逻辑
+         (define search-import-library
+           lambda (lib-name search-paths extensions)
+           (define load-source-library
+             lambda (source)
+             (if (compile-imported-libraries)
+                       (compile-library source)
+                       load-sourcefile))
+             )
+           ;;; for-each paths
+           (if (and find-search-path/lib-name.<src-ext> find-search-path/lib-name.<lib-ext>)
+               ;;; 同时存在 source,object files
+               (if (object-not-older)
+                   (load-object-file object)
+                   (load-source-library source)
+               ;;; 只找到一个文件
+                   (load-source-library source)
+               )
+           )
+         #+END_SRC
+    - *编译so文件* echo '(compile-library "filename")' | scheme -q
+    - *(load-program "file")* 更高效
+    - *(load "file")*
+    - *revisit,load/visit*
+    - scheme --libdirs "/home/mio/lib:"
+      scheme --libdirs "/home/moi/libsrc::/home/moi/libobj:"
+    - CHEZSCHEMELIBDIRS 环境变量
+
 ** 5.Scheme Shell Scripts(Scheme脚本)
    --script 制定是Scheme脚本
    参考 src/script/c2-command-line.sh
@@ -231,15 +288,19 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
      *echo '(compile-program "filename")' | scheme -q --optimize-level 3*
    - 使用fixnum 或 flonum 操作替代通用数值操作
    - 使用显式循环而不是嵌套线性表处理 (append/reverse/map)
+   - 在生产代码中关闭"profiling"(分析器)，否则会分析代码会带来大量额外的运行时开销；
 ** 7.Customization(定制)
    Chez Scheme由多个子系统组成：
    - *kernel* 封装系统接口，加载引导或堆文件，启动交互会话，启动脚本，释放系统
    - *petite.boot/scheme.boot* 包含编译器的运行时库
 ** 8.Building and Distribution Applications(构建和发布应用程序)
    Petite Chez Scheme *Characteristics(特性)*.
-   *Preparing Application Code.*
-   *generate-inspector-information #f* 关闭检测
-   *strip-fasl-file* 删除调试信息
+   - *Preparing Application Code.*
+     + 发布编译后的代码优势
+       1. *效率高* 首先，编译代码通常效率更高
+       2. *避免被破解* 编译代码是二进制形式，因此为专有应用程序代码提供了更多保护。
+   *(generate-inspector-information #f)* 生产代码，关闭检测
+   *(strip-fasl-file)* 删除调试信息,作为(generate-inspactor-information #f)的替代方案
    #+BEGIN_SRC scheme
    (scheme-start
     (lambda fns
@@ -265,9 +326,76 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
       (app-init)
       (app-run fns)))
    #+END_SRC
-   *Building and Running the Application*
+*** Building and Running the Application
    通过cat / copy 命令将多个对象文件组成一个文件
+   对于具有单独库的顶级程序，可以使用compile-whole-program生成单个完全优化的目标文件。
+   否则，在连接目标文件时，将每个库放在它所依赖的库之后，程序最后。
    compile-whole-program 
+   
+   scheme appl.so
+   > ((scheme-start)) ;; 产生 boot file
+   
+   - boot file 相比 object file 优点
+     1. 压缩为运行时静态运行时库，存储管理器永远不会收集静态代码和数据，所以垃圾收集开销减少了。
+        也可以使用(collect ...)使代码、数据静态化
+     2. 系统根据可执行映像的名称在一组标准目录中自动查找启动文件，
+        因此，您可以在应用程序名称下安装Petite Chez Scheme可执行映像的副本，
+        并使您的用户免于提供任何命令行参数或运行单独的脚本来加载应用程序代码。
+   - boot file 是目标文件，可能包含多个源文件的代码，前缀为boot header。
+     boot header: 标识依赖，备选运行方案；
+     petite.boot是基本启动文件
+     加载应用程序引导文件时，将自动加载基本引导文件及其基本引导文件（如果有）。
+   - boot file 创建, (make-boot-file "<user-name>.boot" <list-of-stirng> <stirng-naming-input-files>)
+     (make-boot-file "app.boot" '("petite") "app1.so" "app2.ss" "app3.so")
+     (make-boot-file "app.boot" '("scheme" "petite") "app.so")
+                                 优先加载scheme.boot
+*** Distributing the Application.
+    分发应用程序涉及的可以像创建包含以下项目的分发包一样简单：
+    - Petite Chez Scheme发布包
+    - application boot file
+    - any application-specific shared libraries
+    - an application installation script. (用于安装scheme)
+*** Sample Unix Installation Script.  
+    The script below demonstrates how to perform a straightforward installation of a Scheme application on a Unix-based platform. The script makes the following assumptions, any of which may be changed by altering the script's application configuration parameters:
+
+the name of the application to install is app,
+the machine type upon which the installation will take place is i3le (Intel Linux),
+a single shared library, libapp.so, is included in the distribution, and
+a single application boot file, app.boot, is included in the distribution.
+The script also sets the default location for executables to /usr/bin and shared libraries to /usr/lib. These settings would typically be open to change by the end user; a friendlier script would query the user to verify that these settings are appropriate.
+
+The script first installs Petite Chez Scheme, then installs the boot file and shared libraries, then sets up the executable.
+
+# installation directories
+prefix=/usr
+bin=${prefix}/bin
+lib=${prefix}/lib 
+
+# Petite Chez Scheme version information
+machine=i3le
+release=7.0 
+
+# application configuration
+app=app
+libs=lib${app}.so
+boot=${app}.boot 
+
+# install Petite Chez Scheme
+tar -xzf csv${release}-${machine}.tar.gz
+(cd csv${release}/custom; ./configure --installprefix=${prefix})
+(cd csv${release}/custom; make install) 
+
+# install the boot file
+cp ${boot} ${lib}/csv${release}/${machine}
+chmod 444  
+
+# install the shared libraries
+cp ${libs} ${lib}
+chmod 444 ${libs} 
+
+# create a link for the executable
+ln -s ${bin}/petite ${bin}/${app}
+
 ** 9.Command-Line Options
 * 3.Debugging(调试)
 ** Tracing
@@ -276,11 +404,22 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
    returns:a traced procedure
 #+BEGIN_SRC scheme
 (define half
-  (trace-lambda half (x)
+  (trace-lambda half-name (x)
                 (cond
                  [(zero? x) 0]
                  [(odd? x) (half (- x 1))]
                  [(even? x) (+ (half (- x 1)) 1)])))
+(half 5)
+
+(trace)
+
+(define x (inspect/object '(1 2 3)))
+(x 'type)
+(x 'length)
+(define p (open-output-string))
+(x 'write p)
+(get-output-string p)
+
 #+END_SRC
    *(trace-case-lambda name clause ...)*
    returns: a traced procedure 
@@ -372,11 +511,12 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
 ** 6.Nested object size and compostion
 * 4.Foreign Interface(外部接口)
   Chez Scheme 提供两种外部代码交互方式
-  1. 通过子过程同学
-  2. Scheme调用C动态或静态库，C调用Scheme动态或静态库
+  1. 通过子进程通信
+  2. Scheme调用C动态或静态库，
+     C调用Scheme动态或静态库
 ** 1.Subprocess Communication(子过程通信)
    Two procedures, *(system) and (precess)*, ARE used to create *subprocess*.
-   *(system) (precess)* 用于创建子过程
+   *(system) (precess)* 用于创建子进程
    *(system <command-string>)  is-procedure* 同步等待，stdin/out与console通信
    *(precess <command-string>)  is-prcedure* 异步进行，stdin/out与Scheme通信
    *(open-process-ports command [b-mode] [?transcoder])*
