@@ -419,7 +419,16 @@ ln -s ${bin}/petite ${bin}/${app}
 (define p (open-output-string))
 (x 'write p)
 (get-output-string p)
+;;; 输出端口
+(trace-output-port) ;=> #<output port stdout>
+(inspect car)
+?
 
+(compute-size
+  (let ([x (cons 0 0)])
+    (set-car! x x)
+    (set-cdr! x x)
+    x))
 #+END_SRC
    *(trace-case-lambda name clause ...)*
    returns: a traced procedure 

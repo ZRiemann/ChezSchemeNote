@@ -845,7 +845,232 @@ How might the primitive procedure list be-defined?
 
 ** 3.2 More Recursion(更多递归)
 ** 3.3 Continuations(连续性)
+   - call/cc ; 捕获任意表达式的的continuation
+   - (call/cc p) ; 以procedure为唯一参数
+   - (call/cc (lambda (k) ...)) ; k 表示 continuation, continuation 是procedure
+   - 在 p 内部调用 (k v)，则p返回v，否则返回p的结果
+   - k 在 (call/cc p) 所在表达式的位置，作为continuation，外部调用(k v)
+     时，(call/cc p)作为值v代，继续求值表达式。
+   #+BEGIN_SRC scheme
+   (call/cc
+    (lambda (k)
+      (* 5 4))) ;=> 20 = p
+   (call/cc
+    (lambda (k)
+      (* 5 (k 4)))) ;=> 4 = p
+
+   (define kon #f)
+   (define kon1 #f)
+   (cons 1
+    (list (call/cc
+           (lambda (k)
+             (set! kon1 k)
+             k))
+          (call/cc
+           (lambda (k)
+             (set! kon k)
+             (k 3)
+             4)))) ;=> (1 #<continuation> 3)
+
+   ;; (cons 1 (list con1 3))
+   ;; (cons 1 (list 5 3))
+   ;; (cons 1 '(5 3))
+   ;; (1 5 3)
+   (kon1 5) ;=> (1 5 3)
+   (kon1 6) ;=> (1 6 3)
+   (kon 4)  ;=> (1 6 4)
+
+   (kon1 (lambda (x)
+           (+ 1 x))) ;=> (1 #<procedure> 3)
+   (define call/kon1
+     (lambda (x)
+       (kon1 ((lambda (x1)
+                (+ x1 x))
+              2))))
+   ;;; (1 #<procedure> 3)
+   (call/kon1 4) ;=> (1 6 3)
+   ;;; <=>
+   (cons 1
+         (list ((lambda (x)
+                  ((lambda (x1)
+                     (+ x1 x)) 2))4)
+               3)) ; => (1 6 3)
+
+   ;; define con4 被bingding为continuation
+   ;; define con4 #<continuation>
+   (define kon4
+     (call/cc
+      (lambda (k) k)))
+   kon4 ;=> #<continuation>
+   (list 1 kon4 3) ;=>(1 #<continuation> 3)
+   ;; 调用kon4 在define处被重新binding 为 5
+   (kon4 5) ;** (define con4 5) 
+   kon4 ;=> 5
+   (list 1 kon4 3) ;=> (1 5 3)
+   ;; 由kon4被重新binding为5，不再时continuation
+   ;; (5 6) 抛出异常
+   (kon4 6) ; Exception: attempt to apply non-procedure 5
+
+   (let ([x (call/cc (lambda (k) k))])
+     (x (lambda (ignore) "hi")))
+   ;; <=>
+   (let ([x (lambda (ignore) (display ignore))])
+     (x (lambda (ignore) (display ignore))))
+
+   ;; 递归情况下的后续
+   (define retry1 #f)
+   (define factorial
+     (lambda (x)
+       (if (= x 0)
+           (call/cc (lambda (k) (set! retry1 k) 1))
+           (* x (factorial (- x 1))))))
+   (trace factorial)
+   (trace retry1) ;=> Exception in trace: the top-level value of retry1 is not a procedure
+   (factorial 4)
+   #|
+   (factorial 4)
+   |(factorial 4)
+   | (factorial 3)
+   | |(factorial 2)
+   | | (factorial 1)
+   | | |(factorial 0)
+   | | |1
+   | | 1
+   | |2
+   | 6
+   |24
+   24
+   |#
+   retry1 ;=> #<system continuation>
+   (trace retry1) ;=> (retry1)
+   ;; trace 使 retry1 状态由 continuation 变为 procedure
+   retry1 ;=> #<procedure>
+
+   (retry1 2)
+   #|
+   |(retry1 2)
+   | | |2
+   | | 2
+   | |4
+   | 12
+   |48
+   48
+   |#
+   (retry1 3)
+   #+END_SRC
+
+*** 3.3.1 light-weight process(lwp 轻量进程)
+    - nonpreemptive 非抢占
+    - pause -> continue
+    #+BEGIN_SRC scheme
+    ;;; 非抢占多任务系统
+
+    ;;; 任务队列
+    (define lwp-list '())
+    ;;; 插入任务
+    (define lwp
+      (lambda (trunk)
+        (set! lwp-list (append lwp-list (list trunk)))))
+    ;;; 执行一个任务
+    (define start
+      (lambda ()
+        ;; 取出头部任务
+        (let ([p (car lwp-list)])
+          ;; 将头部任务从链表移除
+          (set! lwp-list (cdr lwp-list))
+          ;; 执行任务
+          (p))))
+
+    ;; 让出执行权，调度其他任务
+    (define pause
+      (lambda ()
+        (call/cc
+         (lambda (k)
+           (lwp (lambda () (k #f)))
+           (start)))))
+
+    (define trunk
+      (lambda (p x)
+        (lambda ()
+          (let f ([cur-cnt 1] [max-cnt 20])
+            ;; 控制循环次数，防止无限循环
+            (when (<= cur-cnt max-cnt)
+                  (pause)
+                  (p x)
+                  (f (+ 1 cur-cnt) max-cnt))))))
+
+    (lwp (trunk display "h"))
+    (lwp (trunk display "e"))
+    (lwp (trunk display "y"))
+    (lwp (trunk display "!"))
+    (lwp (trunk display "\n"))
+    (trace start lwp pause)
+    (start)
+    #+END_SRC
+*** Exercise 3.3.1
+    #+BEGIN_SRC scheme
+    ;; 0
+    ;; 1
+    ;; 2 ... 100 ...
+    (let ([k.n (call/cc (lambda (k) (cons k 0)))])
+      (let [[k (car k.n)] [n (cdr k.n)]]
+        (write n)
+        (newline)
+        (k (cons k (+ n 1)))))
+
+    (call-with-values
+        (lambda () (call/cc (lambda (k) (values k 0))))
+      (lambda (k n)
+        (write n) (newline)
+        (k k (+ n 1))))
+
+    (define product
+      (lambda (ls)
+        (if (null? ls)
+            1
+            (if (= (car ls) 0)
+                0
+                (let ([n (product (cdr ls))])
+                  (if (= n 0) 0 (* n (car ls))))))))
+    (trace product)
+    (product '(1 2 3 4))
+    #+END_SRC
 ** 3.4 Continuation Pass Style(连续传输方式)
+   隐式后继转显式后继
+   #+BEGIN_SRC scheme
+   (letrec ([f (lambda (x) (cons 'a x))]
+            [g (lambda (x) (cons 'b (f x)))]
+            [h (lambda (x) (g (cons 'c x)))])
+     (cons 'd (h '()))) ;=> (d b a c)
+
+   (letrec ([f (lambda (x k) (k (cons 'a x)))]
+            [g (lambda (x k)
+                 (f x (lambda (v) (k (cons 'b v)))))]
+            [h (lambda (x k) (g (cons 'c x) k))])
+     (h '() (lambda (v) (cons 'd v))))
+   ;;;  x   k
+   (g (cons 'c '()) (lambda (v) (cons 'd v)))
+   ;;; f x             k
+   (f (lambda (k x) (k (cons 'a x))))
+   (lambda (cons 'a (cons 'c '())))
+   ;;;
+   (letrec ([h (lambda (x k) (cons x (k 'a)))]
+            [g (lambda (y) (cons 'c y))])
+     (h 'b g))
+   (letrec ([h (lambda (x) (cons x 'a))]
+            [g (lambda (y) (cons y (h 'b)))])
+     (g 'c))
+
+   (eval '(cons 3 4))
+   `(+ 2 3 ,(* 3 4))
+   `(a b ,(reverse '(c d e)) f g)
+   (let ([a 1]
+         [b 2])
+     `(,a . ,b))
+
+   `(+ ,(cdr '(* 2 3)))
+   `(+ ,@(cdr '(* 2 3)))
+   #+END_SRC
 ** 3.5 Internal Definitions(内部定义)
 ** 3.6 Libraries(库)
 * 5. Control Operations
@@ -863,6 +1088,28 @@ How might the primitive procedure list be-defined?
             auternative;
     }
     #+END_SRC
+    
+    #+BEGIN_SRC scheme
+    (if #t
+        'true
+        'false)
+    (if #f
+        'true
+        'false)
+    (if #f
+        'true
+        'flase
+        'invalid-stax)
+    (if #f
+        (begin
+          'true1
+          'true2)
+        (begin
+          'false1
+          'false2))
+    (if #f
+        'true) ;; no return value
+    #+END_SRC
 *** syntax: (cond clause1 clause2 ...) 
     returns: see below 
     libraries: (rnrs base), (rnrs)
@@ -870,7 +1117,7 @@ How might the primitive procedure list be-defined?
     syntax: =>    ;; auxiliary keywords
     libraries: (rnrs base), (rnrs exceptions), (rnrs)
     - clause
-      (test) ;; return true
+      (test) ;; return the first not #f value
       (test expr1 expr2 ...) ;; return last expr values
       (test => expr) ;; return (expr test)
     - last cause
@@ -898,6 +1145,36 @@ How might the primitive procedure list be-defined?
       (select 'e) ;; 0
       #+END_SRC
    
+*** syntax: (when test-expr expr1 expr2 ...)
+    等价于 (if #t (begin expr1 expr2 ...))
+    #+BEGIN_SRC scheme
+    (define-syntax when
+      (syntax-rules ()
+        [(_ e0 e1 e2 ...)
+         (if e0 (begin e1 e2 ...))]))
+
+    (let ([x 10] [y 0])
+      (when (> x 0)
+            (set! y (+ x y))
+            (set! x (- x 1))
+            (display x) (newline)))
+    #+END_SRC
+*** syntax: (unless test-expr expr1 expr2 ...)
+    <==> (if #f (begin expr1 expr2 ...))
+    #+BEGIN_SRC scheme
+    (define-syntax unless
+      (syntax-rules ()
+        [(_e0 e1 e2 ...)
+         (when (not e0) e1 e2 ...)]))
+    #+END_SRC
+*** syntax: (case expr0 clause1 caluse2 ...)
+    #+BEGIN_SRC scheme
+    (let ([x 4] [y 5])
+      (case (+ x y)
+        [(1 3 5 7 9) 'odd]
+        [(2 4 6 8 0) 'even]
+        [else 'out-of-range]))
+    #+END_SRC
 ** 5.4.Recursion and Iteration
 *** syntax: (let name ((var expr) ...) body1 body2 ...) 
     returns: values of the final body expression 
@@ -957,7 +1234,6 @@ How might the primitive procedure list be-defined?
             ((zero? i) j))))
     (sum-all 10)
     #+END_SRC
-
     
 * 6. Operations on Objects(对象的操作)
   本章描述对象支持的操作，对象包括：
@@ -994,7 +1270,33 @@ How might the primitive procedure list be-defined?
 
      但它允许引用文本的部分内容“进行求值”
      unquote和unquote-splicing仅在quasiquote表达式中有效。
-     
+     #+BEGIN_SRC scheme
+     `(+ 2 3) ;=> (+ 2 3)
+     ;;; 反引用对(* 3 4)进行求值然后拼接
+     `(+ 2 ,(* 3 4)) ;=>(+ 2 12)
+     ;;; 反引用可以是变量
+     (let ([a 1] [b 2])
+       `(,a . ,b)) ;=> (1 . 2)
+
+     ;;; ,@(...) 链表提取拼接
+     `(+ 2 ,(list 3 4)) ;=> (+ 2 (3 4))
+     `(+ 2 ,@(list 3 4)) ;=> (+ 2 3 4)
+
+     `(1 ,@2) ;=> (1 . 2)
+     `(,@2) ;=> 2
+     `(,2) ;=> (2)
+
+     `(a (unquote (+ 3 3) (* 3 3)) b)
+     `(a ,(+ 3 3) ,(* 3 3) b)
+
+     (let ([x '(m n)])
+       ``(a ,@,@x f))
+     (let ([x '(m n)])
+       (eval `(let ([m '(b c)]
+                    [n '(d e)])
+                `(a ,@,@x f))
+             (environment '(rnrs))))
+     #+END_SRC
 ** 6.2.Generic Equivalence and Type Predicates
    [[file:../src/tspl-6-Operations-on-Objects/6.2-Generic-Equivalnce-and-Type-Precidcates.ss]]
 
@@ -1011,7 +1313,39 @@ How might the primitive procedure list be-defined?
     - 空列表（）在其出现的任何地方都是相同的。
     - 当且仅当它们具有相同的名称时，两个符号是相同的（通过string =？）。
     - 不能用于可靠地比较数字和字符。
+    
+    #+BEGIN_SRC scheme
+    ;;; 不同类型间比较
+    (eq? 'a 3) ;=> #f
+    (eq? #t 't) ;=> #f
+    (eq? "abc" '(abc)) ;=> #f
+    (eq? "abc" 'abc) ;=> #f
+    (eq? #f '()) ;=> #f
+    ;;; 同类型不同值比较
+    (eq? 9/2 7/2) ;=> #f
+    (eq? 3.4 2342) ;=> #f
+    (eq? 3 3.0) ;=> #f
+    (eqv? 3 3.0) ;=> #f
+    (eq? 1/3 #i1/3) ;=> #f
+    (eqv? 1/3 #i1/3) ;=> #f
+    ;;; 同类型同值比较
+    (eq? 9/2 9/2) ;=> #f
+    (eqv? 9/2 9/2) ;=> #t
+    (eq? 'hello 'hello) ;=> #t
+    (let ([x (* 22222222222222 322222222222222222222)])
+      (eq? x x)) ;=> #t
+    ;;; #t,#f 始终相等
+    (eq? (null? '()) #t) ;=> #t
+    (eq? (null? '(a)) #f) ;=> #t
+    ;;; null始终相等
+    (eq? (cdr '(a)) '()) ;=> #t
+    ;;; 同名符号始终相等
+    (eq? 'abc (string->symbol "abc")) ;=> #t
 
+    (eq? '(a) '(a)) ;=> #f 内存指针不同
+    (eqv? '(a) '(a)) ;=> #t
+    (equal? '(a) '(a)) ;=> #t
+    #+END_SRC
 *** procedure: (eqv? obj1 obj2) 
     returns: #t if obj1 and obj2 are equivalent, #f otherwise 
     libraries: (rnrs base), (rnrs)
@@ -2603,8 +2937,24 @@ How might the primitive procedure list be-defined?
       (define-syntax bind-to-zero
         (syntax-rules ()
           [(_ id) (define id 0)]))
-      (bind-to-zero x)
-      x)
+      (bind-to-zero y)
+      y)
+
+    (define y 1)
+    y
+    #;(bind-to-zero y) ;; Exception: variable bind-to-zero is not bound
+
+    (define f
+      (lambda (x)
+        (+ x 1)))
+    (f 1)
+    (let-syntax ([f (syntax-rules ()
+                      [(_ x) x])]
+                 [g (syntax-rules ()
+                      [(_ x) (f x)])])
+      (list (f 1) (g 1)))
+    #;(g 1) ;; Exception: variable g is not bound
+
     #+END_SRC
 *** syntax: (let-syntax ((keyword expr) ...) form1 form2 ...) 
     syntax: (letrec-syntax ((keyword expr) ...) form1 form2 ...) 
@@ -2612,7 +2962,8 @@ How might the primitive procedure list be-defined?
     libraries: (rnrs base), (rnrs)
 
     每个expr必须是一个转换器。
-    对于let-syntax和letrec-syntax两者，每个关键字都绑定在form1 form2 ....对于letrec-syntax，绑定范围还包括每个expr。
+    对于let-syntax和letrec-syntax两者，每个关键字都绑定在form1 
+    form2 ....对于letrec-syntax，绑定范围还包括每个expr。
 
     以下示例重点介绍let-syntax和letrec-syntax的区别。
     #+BEGIN_SRC scheme
@@ -2998,7 +3349,81 @@ How might the primitive procedure list be-defined?
   #+END_SRC
 
 ** 10.2.Define New Libraryes
-   
+   - (library library-name
+     + (identifier identifier ...)
+     + (identifier identifier ... version)
+       - (subversion ...)
+         nonnegative inteter
+   - (export export-spec ...)
+     + identifier
+     + (rename (internal-name export-name) ...)
+   - (import import-spec ...)
+     + import-set
+       - library-spec
+         - library-reference
+           (identifier identifier)
+           (identifier identifier ... version-reference)
+           + version-reference
+             - (subversion-reference1 ... subversion-referencen)
+               + subversion
+                 - (>= subversion)
+                 - (<= subversion)
+                 - (and subversion-reference ...)
+                 - (or ...)
+                 - (not subversion-reference)
+                 - example
+                   (1 2) (1 3 1)
+                   () (1) => (1 2) (1 3 1)
+                   (1 (>=2)) => (1 2) (1 3 1)
+                   (1 (>=3) (not (1 3 1))) => matches neither
+             - (and version-reference ...)
+             - (or version-reference ...)
+             - (not version-reference)
+         - (library library-reference)
+       - (only import-set identifier ...)
+       - (except import-set identifier ...)
+       - (prefix import-set prefix)
+         - example
+           #+BEGIN_SRC scheme
+           (prefix
+             (only ;; 只导入union,diff
+               (rename (list-tools setops) (difference diff)) ;; 重命名difference 为 diff
+               union
+               diff)
+             set:) ;; 前缀 set:
+           #+END_SRC
+       - (rename import-set (import-name internal-name) ...)
+     + (for import-set import-level ...)
+       - import-level
+         + run ; and (meta 0) are equivalent
+         + expand ; and (meta 1) are equivalent
+         + (meta level)
+           - level represents an exact integer
+   - library-body)
+
+   #+BEGIN_SRC scheme
+   ;;; 定义库
+   ;;; 关键字 library， 库名 library-name
+   (library library-name
+     (export export-spec ...)
+     (import import-spec ...)
+     library-body)
+
+   ;;; library-name
+   (identifier identifier ...)
+   (identifier identifier ... version)
+   ;;; version
+   (subversion ...)
+   ;;; subversion
+   'nonegative-integer
+
+   ;;; export-spec
+   'identifer
+   (rename (internal-name export-name) ...)
+   ;;; internal-name, export-name is identifier
+
+
+   #+END_SRC
 *** define liarary form syntax
     #+BEGIN_SRC scheme
     ;;; 自定义库
@@ -3042,14 +3467,13 @@ How might the primitive procedure list be-defined?
       set:)
     #+END_SRC
 
-*** 10.3.Top-Level Programs
+** 10.3.Top-Level Programs
     顶级程序本身不是语法形式，而是一组通常仅由文件边界分隔的forms。
     顶级程序可以被认为是没有库包装器的库forms;
     (import import-spec ...)
     definition-or-expression
     ...
-   
-   
+      
 **** procedure: (command-line) 
      returns: a list of strings representing command-line arguments 
      libraries: (rnrs programs), (rnrs)
@@ -3064,7 +3488,7 @@ How might the primitive procedure list be-defined?
      returns: does not return 
      libraries: (rnrs programs), (rnrs)
      
-     退出程序，回到超作系统
+     退出程序，回到操作系统
      
 ** 10.4.Examples
    #+BEGIN_SRC scheme
@@ -3278,3 +3702,71 @@ How might the primitive procedure list be-defined?
     #+END_SRC
 ** 11.2.Defining Condition Types
    虽然程序可以传递raise或raise-continuable任何Scheme值，但描述异常情况的最佳方法通常是创建并传递条件对象。
+* 12. Extended Examples
+** 12.11. Multitasking with Engines
+   - use case
+     multiprocession
+     light-weight threads
+     operating system kernels
+     nondeterministic computations
+   - ability
+     timed preemption
+   - usage
+     - (make-engine ...)
+       - ticks
+         -type 正整数
+         -desc 指定超时时中周期，要么超时，要么任务结束
+       - complete
+         - type 
+           procedure of two arguments;2参数的过程
+           - arg1
+             the amount of fuel left over; 剩余时中
+           - arg2
+             the result of the computation; 计算结果
+         - description what to do if the computation finishes;任务完成回调
+       - expire
+         - type
+           procedure of one arguments;1参数过程
+           - arg1
+             a new capable of continuing the computation from the point of interruption;
+             剩余任务的engine，engine可被继续分配时间片执行，直到完成任务。
+         - description
+           what to do if the fuel runs out before computation finishes;任务超时回调
+   #+BEGIN_SRC scheme
+   ;;; An engine is created by passing a chunk(procedure of no arguments) to the procedure make-engine
+   ;;;
+   (define engine-logic
+     (lambda (ticks complete expire)
+       (timer ticks)
+       'do-tasks
+       (if (task-done?)
+           (complete left-ticks task-result)
+           (expire new-engine))))
+
+   ;;; engine usage
+   (define fac-recur
+     (lambda ()
+       (let f [(x 100)]
+         (if (= 0 x)
+             1
+             (* x (f (- x 1)))))))
+   (define fac-recur-tail
+     (lambda ()
+       (let f ([x 100] [val 1])
+         (if (= x 0)
+             val
+             (f (- x 1) (* val x))))))
+
+   (define complete-engine
+     (lambda (task ticks)
+       (let loop ([engine (make-engine task)]
+                  [ticks-count 0])
+         (engine ticks
+                 (lambda (ticks-left value)
+                   (values value (+ ticks-count (- ticks ticks-left))))
+                 (lambda (new-eng)
+                   (display (/ ticks-count ticks)) (newline)
+                   (loop new-eng (+ ticks ticks-count)))))))
+   (complete-engine fac-recur-tail 10)
+   (complete-engine fac-recur-tail 200)
+   #+END_SRC

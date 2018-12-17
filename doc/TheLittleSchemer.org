@@ -1,0 +1,482 @@
+
+* 2. Do It
+  #+BEGIN_SRC scheme
+  (define lat?
+    (lambda (l)
+      (cond
+       ((null? l) #t)
+       ((atom? (car l)) (lat? (cdr l)))
+       (else #f))))
+  (lat? '(1 2 3)) ;=> #t
+  (lat? '((1 2) 3)) ;=> #f
+
+  (define member?
+    (lambda (a lat)
+      (cond
+       ((null? lat) #f)
+       (else (or (eq? (car lat) a)
+                 (member? a (cdr lat)))))))
+  #+END_SRC
+* 3. Cons the magnificent
+  #+BEGIN_SRC scheme
+  (define rember
+    (lambda (a lat)
+      (cond
+       ((null? lat) '())
+       (else (cond
+              ((eq? (car lat) a) (cdr lat))
+              (else (rember a (cdr lat))))))))
+  (rember 'and '(bacon lettuce and tomato)) ;=>(tomato)
+
+  (define rember
+    (lambda (a lat)
+      (cond
+       ((null? lat) '())
+       (else (cond
+              ((eq? (car lat) a) (cdr lat))
+              (else (cons (car lat)
+                          (rember a (cdr lat)))))))))
+  (rember 'and '(bacon lettuce and tomato)) ;=>(bacon lettuce tomato)
+
+  (define rember
+    (lambda (a lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) a) (cdr lat))
+       (else (cons (car lat)
+                   (rember a (cdr lat))))))))
+  (rember 'and '(bacon lettuce and tomato)) ;=>(bacon lettuce tomato)
+  #+END_SRC
+  #+BEGIN_SRC scheme
+  ;;; The 3th Commandment
+  ;;; When building a list, describe the first typical element,
+  ;;; and then cons it onto the natural recursion
+
+  (define firsts
+    ;; state the function name
+    (lambda (l)
+      ;; ask questions about the actually auguments
+      (cond
+       ;; First Commandment, end condition
+       ;; first question
+       ((null? l)
+        ;; cons '() for list
+        '())
+       ;; second question
+       ;; last question
+       (else
+        ;; building a list
+        (cons (car (car l)) ;; 3th Commandment
+              ;; only look at one S-expression
+              ;; to look the rest, we must recur.
+              (firsts (cdr l)))))))
+
+  (firsts '((a b) (c d) (e f)))
+  #+END_SRC
+  (insertR new old lat)
+  #+BEGIN_SRC scheme
+  (define insertR
+    (lambda (new old lat)
+      (cond
+       ;; 1. we ask (null? lat)
+       ((null? lat) '())
+       ;; 2. we ask (else )
+       (else
+        (cond
+         ((eq? (car lat) old)
+          (cons old
+                (cons new (cdr lat))))
+         ;; 2.2 else
+         (else (cons (car lat)
+                     (insertR new old (cdr lat)))))))))
+
+  (define insertR
+    (lambda (new old lat)
+      (if (null? lat)
+          '()
+          (if (eq? (car lat) old)
+              (cons old (cons new (cdr lat)))
+              (cons (car lat) (insertR new old (cdr lat)))))))
+
+  (define insertR
+    (lambda (new old lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) old) (cons old (cons new (cdr lat))))
+       (else (cons (car lat) (insertR new old (cdr lat)))))))
+
+  (insertR 'topping 'fudge '(ice cream with fudge for dessert))
+
+  ;; insert left
+  (define insertL
+    (lambda (new old lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) old) (cons new lat))
+       (else (cons (car lat) (insertL new old (cdr lat)))))))
+
+  (insertL 'topping 'fudge '(ice cream with fudge for dessert))
+
+  ;; subst
+  (define subst
+    (lambda (new old lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) old) (cons new (cdr lat)))
+       (else (cons (car lat) (subst new old (cdr lat)))))))
+
+  (subst 'topping 'fudge '(ice cream with fudge for dessert))
+
+  ;; subst2
+  (define subst2
+    (lambda (new o1 o2 lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) o1) (cons new (cdr lat)))
+       ((eq? (car lat) o2) (cons new (cdr lat)))
+       (else (cons (car lat) (subst2 new old (cdr lat)))))))
+
+  (subst2 'vanilla 'chocolate 'banana '(banana ice cream with chocolate topping))
+                                          ;=> (vanilla ice cream with chocolate topping)
+
+  ;; subst2
+  (define subst2
+    (lambda (new o1 o2 lat)
+      (cond
+       ((null? lat) '())
+       ((or (eq? (car lat) o1) (eq? (car lat) o2)) (cons new (cdr lat)))
+       (else (cons (car lat) (subst2 new old (cdr lat)))))))
+
+  (subst2 'vanilla 'chocolate 'banana '(banana ice cream with chocolate topping))
+                                          ;=> (vanilla ice cream with chocolate topping)
+  #+END_SRC
+
+  (multirember a lat)
+  #+BEGIN_SRC scheme
+  (define multirember
+    (lambda (a lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) a) (multirember a (cdr lat)))
+       (else (cons (car lat) (multirember a (cdr lat)))))))
+
+  (multirember '1 '(1 2 3 1 2 3))
+
+  (define list-recur
+    (lambda (ls test handle)
+      (cond
+       ((null? ls) '())
+       ((test (car ls))
+        (cons (handle (car ls)) (list-recur (cdr ls) test handle)))
+       (else (cons (car ls) (list-recur (cdr ls) test handle))))))
+
+  (define multiinsertR
+    (lambda (new old lat)
+      (cond
+       ((null? lat) '())
+       ((eq? (car lat) old)
+        (cons (car lat)
+              (cons new (multiinsertR new old (cdr lat)))))
+       (else (cons (car lat) (multiinsertR new old (cdr lat)))))))
+
+  (multiinsertR '2 '1 '(1 3 1 4))
+  (list-recur
+   '(1 3 1 4)
+   (lambda (x) (eq? x '1))
+   (lambda (x) (cons x '2)))
+
+  (list-recur
+   '(1 3 1 4)
+   (lambda (x) (> x 2))
+   (lambda (x) (list x '2)))
+  #+END_SRC
+
+  - The 4th Commandment
+    Always change at least one argument while recurring.
+    It must be changed to be closeer termination.
+    The changing augument must be tested in the termination condition:
+    when using cdr, thest termination with null?
+    每次第归至少 *改变一个参数* ；
+    变更的参数必须 *‘单调逼近’结束条件* ；
+    *参数变更 约束 结束条件*
+* 4. Numbers Games
+  正整数数字递归
+  - *tuple* 正整数列表, (*[num ])
+  - *number* 正整数，(*[1 ])
+  - *(zero? n)* 递归结束条件
+  - *(sub1 n)* 参数变更函数
+  - *questions* 
+    1. is terminal
+    2. else 
+  - *1st Commandment* (zero? n), else
+  - *addtup* builds a number by totaling all the numbers in a tuple;
+  - *4th Commandment(v.1)*
+    Always change at least one argument while recurring.
+    It must be changed to the closer to termination.
+    The changing argument must be tested in the termination condition:
+    when using cdr, test termination with null? and
+    when using sub1, test termination with zero?.
+  - *5th Commandment*
+    When building a value with +, always use 0 for the value of the
+    termination line, for add 0 does not change the value of an addition.
+    When building a value with *, always use 1 for the value of the
+    terminating line, for multiply by 1 does not change the value of multiplication.
+    When building a value with cons, always consider () for the value of
+    the termination line.
+  #+BEGIN_SRC scheme
+  (atom? 1) ;=> #t , all numbers are atoms
+
+  ;;; increment x with 1
+  (define add1
+    (lambda (x)
+      (+ x 1)))
+  (add1 1) ;=> 2
+
+  ;;; decimal x with 1
+  (define sub1
+    (lambda (x)
+      (- x 1)))
+  (sub1 1) ;=> 0
+
+  (define add
+    (lambda (n m)
+      (cond
+       ((zero? m) n)
+       (else (add1 (add n (sub1 m)))))))
+  (add 2 3)
+
+  (define sub
+    (lambda (n m)
+      (cond
+       ((zero? m) n)
+       (else (sub1 (sub n (sub1 m)))))))
+  (sub 4 2)
+
+  ;;; + 推演
+  (define addtup
+    (lambda (tup)
+      (cond
+       ((null? tup) 0)
+       (else (add (car tup) (addtup (cdr tup)))))))
+  (addtup '(2 3 4))
+
+  ;;; 用 + 推演 *
+  (define multi
+    (lambda (n m)
+      (cond
+       ((zero? m) 0)
+       (else (add n (multi n (sub1 m)))))))
+
+  (multi 3 4)
+
+  ;;; 推演 tup1 + tup2
+  (define tupadd
+    (lambda (tup1 tup2)
+      (cond
+       ((and (null? tup1) (null? tup2)) '())
+       (else
+        (cons (add (car tup1) (car tup2))
+              (tupadd (cdr tup1) (cdr tup2)))))))
+  (tupadd '(1 2) '(3 4))
+
+  ;;; 用0,1,sub推演 >
+  (define num>?
+    (lambda (n m)
+      (cond
+       ((zero? n) #f)
+       ((zero? m) #t)
+       (else (num>? (sub1 n) (sub1 m))))))
+  (num>? 3 2)
+  (num>? 3 3)
+  (num>? 3 4)
+
+  ;;; ==
+  (define num=?
+    (lambda (n m)
+      (cond
+       ((zero? n) (zero? m))
+       ((zero? n) #f)
+       (else (num=? (sub1 n) (sub1 m))))))
+  (num=? 3 4)
+
+  ;;; number power
+  (define num-power
+    (lambda (n m)
+      (cond
+       ((zero? m) 1)
+       (else (multi n (num-power n (sub1 m)))))))
+  (num-power 2 3)
+
+  ;;; number div
+  (define num-div
+    (lambda (n m)
+      (cond
+       ((< n m) 0)
+       (else (add1 (num-div (sub n m) m))))))
+
+  (define length
+    (lambda (lat)
+      (cond
+       ((null? lat) 0)
+       (else (add1 (length (cdr lat)))))))
+
+  (define pick
+    (lambda (n lat)
+      (cond
+       ((zero? (sub1 n)) (car lat))
+       (else (pick (sub1 n) (cdr lat))))))
+
+  (define rempick
+    (lambda (n lat)
+      (cond
+       ((zero? (sub1 n)) (cdr lat))
+       (else (cons (car lat)
+                   (rempick (sub1 n)
+                            (cdr lat)))))))
+  (rempick '2 '(1 2 3))
+
+  (define no-nums
+    (lambda (lat)
+      (cond
+       ((null? lat) '())
+       (else (cond
+              ((number? (car lat)) (no-nums (cdr lat)))
+              (else (cons (car lat) (no-nums (cdr lat)))))))))
+  (no-nums '(1 aaa 2 bbb 3 ccc))
+
+  (define eqany?
+    (lambda (a1 a2)
+      (cons
+       ((and (number? a1) (number? a2)) (= a1 a2))
+       ((or (number? a1) (number? a2)) #f)
+       (else (eq? a1 a2)))))
+
+  (define occur
+    (lambda (a lat)
+      (cond
+       ((null? lat) 0)
+       (else
+        (cond
+         ((eq? (car lat) a)
+          (add1 (occur a (cdr lat))))
+         (else (occur a (cdr lat))))))))
+  (occur '1 '(1 3 1 4))
+  #+END_SRC
+* 5. It's Full of Stars(晕)
+  deal with list members is not atom condition.
+  链表成员不在是单纯的原子，也有可能是链表，如何递归进入链表处理数据；
+
+  - *1st Commandment(final)*
+    When recurring on a list of atoms, lat, ask two questions
+    about it:(null? lat) and else.
+    When recurring on a number, n, ask two questions about
+    it:(zero? n) and else.
+    When recurring on a list of S-expressions, l, ask three
+    question about it:(null? l), (atom? (car l)), and else.
+  - *4th Commandment(final)*
+    Always change at least one argument while recurring.
+    When recurring on a list of atoms, lat, use (cdr lat).
+    When recurring on a number, n, use (sub1 n), And
+    When recurring on a list of S-expressions, l, use (car l)
+    and (cdr l) if neither (null? l) nor (atom? (car l)) are true.
+    
+    It must be changed to be closer to termination. the changeing
+    argument must be tested in the termination condition:
+    
+    when using cdr, test termination with null? and
+    when using sub1, test termination with zero?.
+  #+BEGIN_SRC scheme
+  (define rember*
+    (lambda (a l)
+      (cond
+       ((null? l) '())
+       ((atom? (car l))
+        (cond ((eq? (car l) a) (rember* a (cdr l)))
+              (else (cons (car l)
+                          (rember* a (cdr l))))))
+       (else (cons (rember* a (car l))
+                   (rember* a (cdr l)))))))
+  (rember* 'a '((a b c) (c b a) a)) ;=> ((b c) (c b))
+
+  (define insertR*
+    (lambda (new old l)
+      (cond ((null? l) '())
+            ((atom? (car l))
+             (cond ((eq? (car l) old)
+                    (cons old (cons new (insertR* new old (cdr l)))))
+                   (else (cons (car l)
+                               (insertR* new old (cdr l))))))
+            (else (cons (insertR* new old (car l))
+                        (insertR* new old (cdr l)))))))
+  (insertR* 'x 'a '((a b c) (c b a) a)) ;=> ((a x b c) (c b a x) a x)
+
+  (define occur*
+    (lambda (a l)
+      (cond
+       ([null? l] 0)
+       ([atom? (car l)] (cond
+                   ([eq? (car l) a] (add1 (occur* a (cdr l))))
+                   (else (occur* a (cdr l)))))
+       (else (add (occur* a (car l))
+                  (occur* a (cdr l)))))))
+  (occur* 'a '((a b c) (c b a) a))
+
+  ;;(define subst*)
+  ;;(define insterL*)
+  #+END_SRC
+* 6. Shadows
+* 7. Friends and Relations
+  - *set?* 集合，无重复原子对象；
+  #+BEGIN_SRC scheme
+  (define member?
+    (lambda (a lat)
+      (cond ([null? lat] #f)
+            ([eq? (car lat) a] #t)
+            (else (member? a (cdr lat))))))
+
+  (define set?
+    (lambda (lat)
+      (cond
+       ((null? lat) #t)
+       ([member? (car lat) (cdr lat)] #f)
+       (else (set? (cdr lat))))))
+  (set? '(1 2 3 1))
+
+  (define t-length
+    (lambda (ls)
+      (if (null? ls)
+          0
+          (+ (t-length (cdr ls)) 1))))
+  (define tail-length
+    (lambda (ls)
+      (let tail-recur ([ls ls]
+                       [len 0])
+        (if (null? ls)
+            len
+            (tail-recur (cdr ls) (+ 1 len))))))
+  (trace t-length)
+  (t-length '(1 2 3))
+  (trace tail-length)
+  (tail-length '(1 2 3))
+
+  (define-syntax t-let
+    (syntax-rules ()
+      [(_) #t]
+      [(_ e) (+ e 1)]
+      [(_ ([x e] ...) b1 b2 ...)
+       ((lambda (x ...) b1 b2 ...) e ...)]))
+  (t-let ()
+         (+ 2 3))
+  (t-let)
+  (t-let 3)
+
+  (let ([x 2])
+    (+ x 2))
+  ((lambda (x) (+ x 2)) 2)
+
+  (let ([x (call/cc (lambda (k) k))])
+    (x (lambda (ignore) "hi")))
+  ((lambda (x) (x (lambda (ignore) "hi"))) (call/cc (lambda (k) k)))
+
+  (((call/cc (lambda (k) k)) (lambda (x) x)) "hey")
+  #+END_SRC
