@@ -523,53 +523,141 @@ ln -s ${bin}/petite ${bin}/${app}
   1. 通过子进程通信
   2. Scheme调用C动态或静态库，
      C调用Scheme动态或静态库
-** 1.Subprocess Communication(子过程通信)
+** 4.1.Subprocess Communication(子过程通信)
    Two procedures, *(system) and (precess)*, ARE used to create *subprocess*.
    *(system) (precess)* 用于创建子进程
    *(system <command-string>)  is-procedure* 同步等待，stdin/out与console通信
    *(precess <command-string>)  is-prcedure* 异步进行，stdin/out与Scheme通信
    *(open-process-ports command [b-mode] [?transcoder])*
-** 2.Calling out of Scheme(外部调用Scheme)
-   *(foreign-rpcedure entry-exp (param-type ...) ret-type)   is-syntax*
-   *(foreign-procedure conv ecntry-exp (param-type ...) res-type)  is-syntax*
-   returns: a procedure
-   
-C 接口
-int id(int x){return x;}
-Scheme 引入C接口
-#+BEGIN_SRC scheme
-(foreign-procedure "id" (int) int)
-;; #<procedure
-((foreign-procedure "id" (int) int) 1)
-;; 1
-(define int-id
-  (foreign-procedure "id" (int) int))
-(int-id 1)
-;; 1
+** 4.2.Calling out of Scheme(外部调用Scheme)
+   - *(foreign-procedure entry-exp (param-type ...) ret-type)   is-syntax*
+   - *(foreign-procedure conv ... entry-exp (param-type ...) res-type)  is-syntax*
+     returns: a procedure
+     - conv ; convention(调用约定)
+       - #f ; default calling convention on target machine
+       - on windows ; __stdcall, __cdecl (default), __com (32-bit only)
+         (forgign-procedure __com 12 (iptr double-float) integer-32)
+       - __collect_safe ; allow garbage collection concurrent to a call of foreign procedure.
+         #+BEGIN_SRC scheme
+         (define c-sleep
+           (foreign-procedure __collect_safe "sleep" (unsigned) unsigned))
+         (c-sleep 10) ; sleeps for 10 seconds without blocking other threads
+         #+END_SRC
+     - entry-exp ; 入口表达式
+       - string  ; entry point
+       - integer ; address of the foreign procedure
+     - param-types ; 入口参数
+       - type ; symbols or [[structed forms]]         
+     - res-type ; 返回值类型
+       - type ; symbols or [[structed forms]]
+     - valid parameter types ; 有效的参数类型
+       - caution ; 注意
+         使用以下数据必须保持警惕：
+         (scheme-object, string, wstring, u8*,u16*,u32*,utf-8,utf-16le,utf-l6be,utf-32-le,utf-32be)
+         避免将数据保存在外部变量中，因为可能随时被垃圾回收导致无效数据；
+         避免将以上数据作为参数传递给 __collect_safe procedure
+         其他数据类型可以安全的转换为对等外部数据，其生命周期可由外部过程控制
+         (string, wstring, ...) 转换为新对象，不能作为 __collect_safe procedure的参数和返回值。
+       - scheme type <=> c type ; 类型映射
+         | scheme             | C-type           | description                          |
+         |--------------------+------------------+--------------------------------------|
+         | integer-8          | char/singed char | -128 ~ 127                           |
+         | unsigned-8         | unsigned char    | 0~255                                |
+         | integer-16         | short            |                                      |
+         | unsigned-16        | unsigned short   |                                      |
+         | integer-32         | int              |                                      |
+         | unsigned-32        | unsigned int     |                                      |
+         | integer-64         | long/long long   |                                      |
+         | unsigned-64        |                  |                                      |
+         | double-float       | double           |                                      |
+         | single-float       | float            |                                      |
+         | short              |                  |                                      |
+         | unsigned-short     |                  |                                      |
+         | int                |                  |                                      |
+         | unsigned           |                  |                                      |
+         | unsigned-int       |                  |                                      |
+         | long               |                  |                                      |
+         | unsigned-long      |                  |                                      |
+         | long-long          |                  |                                      |
+         | unsigned-long-long |                  |                                      |
+         | ptrdiff-t          |                  | stddef.h                             |
+         | size_t             |                  | stddef.h                             |
+         | ssize_t            |                  |                                      |
+         | iptr               |                  | int*                                 |
+         | uptr               | void*            |                                      |
+         | void*              | void*            |                                      |
+         | fixnum = iptr      |                  |                                      |
+         | boolean            |                  |                                      |
+         | char               |                  |                                      |
+         | wchar_t            |                  |                                      |
+         | wchar = wchar_t    |                  |                                      |
+         | double             |                  | double-float                         |
+         | float              |                  | single-float                         |
+         | scheme-object      |                  |                                      |
+         | ptr                |                  | scheme-object                        |
+         | u8* -> bytevector  |                  | null-terminated \0 sequence of 8-bit |
+         | u16*               |                  | null-terminated \0\0 ...             |
+         | u32*               |                  | \0\0\0\0 terminated(字节对齐)        |
+         | utf-8 -> string    |                  |                                      |
+         | utf-16le/be        |                  |                                      |
+         | utf-32le/be        |                  |                                      |
+         | string = utf-8     |                  |                                      |
+         | wstring = ...      |                  |                                      |
+         | (* ftype)          |                  | address of foreign object            |
+         | (& ftype)          |                  | foreigh object                       |
+         |                    |                  |                                      |
+   #+TBLFM: $3=double-float
+   C 接口
+   int id(int x){return x;}
+   Scheme 引入C接口
+   #+BEGIN_SRC scheme
+   (foreign-procedure "id" (int) int)
+   ;; #<procedure
+   ((foreign-procedure "id" (int) int) 1)
+   ;; 1
+   (define int-id
+     (foreign-procedure "id" (int) int))
+   (int-id 1)
+   ;; 1
 
-;; 可以改造成bool
-(define bool-id
-  (foreign-procedure "id" (boolean) boolean))
-(bool-id #f)
-;; #f
-(bool-id 1)
-;; #t
-#+END_SRC
-** 3.Calling into Scheme
-   *(foreign-callable conv ... proc-exp (param-type ...) res-type)  is-syntax*
-   return: a code object
-   - proc-exp
-     a procedure is to be invoked by foreign code.
-** 4.Continuations and Foreign Calls
-** 5.Foreign Data
+   ;; 可以改造成bool
+   (define bool-id
+     (foreign-procedure "id" (boolean) boolean))
+   (bool-id #f)
+   ;; #f
+   (bool-id 1)
+   ;; #t
+   #+END_SRC
+** 4.3.Calling into Scheme
+   将scheme接口被C/C++ ... 调用
+   - *(foreign-callable conv ... proc-exp (param-type ...) res-type)  is-syntax*
+     return: a code object
+     - proc-exp
+       a procedure is to be invoked by foreign code.
+** 4.4.Continuations and Foreign Calls
+** 4.5.Foreign Data
    *(foreign-alloc)*
    *(foreign-free)*
    *(foreign-sizeof)*
    *(foreigh-ref type address offset)*
-** 6.Providing Access to Foreign Procedures
-** 7.Using Other Foreign Language
-** 8.C Library Routines
-** 9.Socket Operations
+** 4.6.Providing Access to Foreign Procedures
+   - load-shared-object
+   - Sforeign_symbol/Sregister_symbol [[4.8]]
+   - (foreign-entry? entry-name)
+     #+BEGIN_SRC scheme
+     (load-shared-object "libc.so.6")
+     (if (foreign-entry? "strlen")
+         ((foreign-procedure "strlen"
+                             (string) size_t)
+          "hey!")
+         (error 'foreigh-entry "not foreign entry" foreign-entry?))
+     (library-directories)
+     #+END_SRC
+   - 
+
+** 4.7.Using Other Foreign Language
+** 4.8.C Library Routines
+** 4.9.Socket Operations
 * 5.Binding Forms
   
    
@@ -590,3 +678,5 @@ edures and syntatic forms.
 While the kernel and base boot file *are essential to* the operation of all pr-
 ograms,
 内核和引导文件是启动程序的必须条件；
+* chez-bee
+  - c2scheme.ss [c-header.h|c-header-dir] ; script convert c-header.h entrys to scheme procedure

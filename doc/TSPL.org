@@ -1174,6 +1174,21 @@ How might the primitive procedure list be-defined?
         [(1 3 5 7 9) 'odd]
         [(2 4 6 8 0) 'even]
         [else 'out-of-range]))
+
+    ;;; test symbol
+    (define test-symbol-case
+      (lambda (x)
+        (case x
+          ;; not support symbol list
+          ['(aaa bbb) (printf "aaa or bbb~%")]
+          [(list 'aaa 'bbb) (printf "list aaa,bbb~%")]
+          ;; single symbol ok
+          ['hello (display "hello\n")]
+          [else (display "else\n")])))
+    (test-symbol-case 'aaa)
+    (test-symbol-case 'bbb)
+    (test-symbol-case 'hello)
+    (test-symbol-case 'ccc)
     #+END_SRC
 ** 5.4.Recursion and Iteration
 *** syntax: (let name ((var expr) ...) body1 body2 ...) 
@@ -3103,7 +3118,7 @@ How might the primitive procedure list be-defined?
 ** 8.4.Examples
    
 * 9. Records
-  本章描述了程序员定义新数据类型或记录类型的方法，每种类型都与所有其他类型不同。
+  本章描述了程序员定义新数据类型(即记录,类型)的方法，每种类型都与所有其他类型不同。
   记录通过define-record-type form或make-record-type-descriptor procedure定义。
   
 ** 9.1.Define Records
@@ -3315,6 +3330,213 @@ How might the primitive procedure list be-defined?
     ;; ...
     #+END_SRC
 
+** 9.x.summary
+   - 需求
+       一个复杂对象需要由多个基本数据类型描述，于是就需要一个能表达复杂对象的机制；
+       记录就被设计出来；
+     - 需要一个标识符来标识一个记录，name
+     - 需要一个谓词来判断该对象是否为一个记录对象，predicate
+       由于scheme的语言特性决定，需要用谓词来判断对象类型，进而确定对象特性；
+     - 支持多个种类型组合
+       - 需要 field (字段)概念
+         - 字段需要 字段名称
+         - 访问器
+     - 需要一个构造器来构造一个记录示例；
+     - 需要一个定义器来定义记录；
+     - 支持父类
+     - 支持UUID
+     - 至此缺省构造参数
+       
+   - 设计
+     - 定义器
+       (define-record-type (record-name constructor pred) clause ...)
+       - define-record-types
+         - record-name
+           - constructor
+           - predicate
+         - cluase
+           - fields
+             (fields [immmutable|mutale] <field-name> [accser-name] [mutator-name])
+             - immultable ; 不可修改
+             - multable ; 可修改
+             - accerror-name ; 访问器
+             - mutator-name ; 赋值器
+           - parent
+             (parent parent-name) ; 父类
+           - nongenerative ; UUID
+             - <none> ; 每个定义产生一个UUID
+             - (nongenerative) ; 作用于内不产生新UUID
+             - (nongenerative <user-uuid>) ; 全局使用<user-uuid>
+           - protocol ; 构造仪式
+           - sealed ; 密封的,标记不可被扩展，即不可作为父类
+             (sealed [#f|#t])
+           - opaque ; 不透明的， 不可被谓词判断record?
+           - parent-rtd
+             (parent-rtd parent-rtd parent-rcd)
+             (make-record-type-descriptor)
+             (make-record-constructor-descriptor)
+       - (make-record-type-descriptor name parent uid s? o? fields)
+         more flexibility than (define-record-type)
+         but *lead less readable and efficient programs*
+         if (define-record-type) suffices, don't use (make-record-type-descriptor)
+     - inspection
+       - (record-type-name rtd)
+         #+BEGIN_SRC scheme
+         (define record->name
+           (lambda (x)
+             (if (record? x)
+                 (record-type-name (record-rtd x))
+                 #f)))
+         (define-record-type dim (fields w l h))
+         (record->name (make-dim 10 15 6))
+         (define-record-type dim (fields w l h) (opaque #t))
+         (record->name (make-dim 10 15 6))
+         #+END_SRC
+       - (record-type-parent rtd)
+         procedure, return the parent of trd, or #f if it has no parent
+         #+BEGIN_SRC scheme
+         (define-record-type point (fields x y))
+         (define-record-type cpoint (parent point) (fields color))
+         (record-type-parent (record-type-deacriptor point))
+         (record-type-parent (record-type-descriptor cpoint))
+         #+END_SRC
+       - (record-type-uid rtd)
+         #+BEGIN_SRC scheme
+         (define-record-type point (fields x y))
+         (define-record-type cpoint
+           (parent point)
+           (fields color)
+           (nongenerative user-defined-uuid-111-222))
+         (record-type-uid (record-type-descriptor point)) ;=> #{point n7hnxzdqr3i735efe2pue5ze7-0}
+         (record-type-uid (record-type-descriptor cpoint)) ;=> user-defined-uuid-111-222
+         #+END_SRC
+       - (record-type-generative? rtd)
+       - (record-type-sealed? rtd)
+       - (record-type-opaque? rtd)
+       - (record-type-field-names rtd)
+       - (record-field-mutable? rtd idx)
+       - (record? obj)
+       - (record-rtd record)
+     - 特性
+       - 默认：每个相同名词的记录，均采用不同的UUID标识不同的类型；
+       - (nongenerative) : 相同作用域内的定义，不产生新的UUID
+       - (nongenerative user-def-uuid) : 全局采用统一的UUID
+       - (parent pname) :支持父类
+       - (protocol ) : 支持重定义构造参数,解耦合父子间的构造器，可以父类和独立演变
+               
+   - 示例
+     #+BEGIN_SRC scheme
+     ;;; name: point
+     ;;; fields: x y
+     ;;; implicity interfaces:
+     ;;; constructor: (make-point x y) ; make-<record-name>
+     ;;; predicate: (point? obj)       ; <record-name>?
+     ;;; accessor: (point-x p)         ; <record-name>-<field-name>
+     (define-record-type point (fields x y))
+
+     ;;; Use constructor procedure to make point instance.
+     (define p (make-point 36 -17))
+     (point? p) ;=> #t
+     (point? (cons 36 -17)) ;=> #f
+     (point-x p) ;=> 36
+     (point-x-set! p 16)
+     (point-x p) ;=> 16
+     (compute-size p) ;=> 752
+     (compute-size point-x) ;=> 1312
+     (compute-size point?) ;=> 1120
+
+     ;;; 重定义完整的point
+     (define-record-type (point make-point point?)
+       (fields (mutable x point-x point-x-set!)
+               (immutable y point-y))
+       (nongenerative really-the-same-point))
+     make-point
+     ;;; test (nongenerative ...)
+     (define (f p)
+       (define-record-type point (fields x y))
+       (if (eq? p 'make) (make-point 3 4) (point? p)))
+     (f (f 'make)) ;=> #f
+     (define (f p)
+       (define-record-type point (fields x y) (nongenerative))
+       (if (eq? p 'make) (make-point 3 4) (point? p)))
+     (define p (f 'make))
+     (f p) ;=> #t
+
+
+     ;;; test (nongenerative user-uuid)
+     (define (f)
+       (define-record-type point (fields x y) (nongenerative))
+       (make-point 3 4))
+     (define (g p)
+       (define-record-type point (fields x y) (nongenerative))
+       (point? p))
+     (g (f)) ;=> #f
+
+     (define (f)
+       (define-record-type point (fields x y)
+         (nongenerative really-the-same-point))
+       (make-point 3 4))
+     (define (g p)
+       (define-record-type point (fields x y)
+         (nongenerative really-the-same-point))
+       (point? p))
+     (g (f)) ;=> #t
+
+     ;;; clause parent
+     (define-record-type point (fields x y))
+     (define-record-type cpoint (parent point) (fields color))
+     (define cp (make-cpoint 3 4 'red))
+     (point? cp)
+     (cpoint? cp)
+     (point-x cp)
+     (point-y cp)
+     (cpoint-color cp)
+
+     ;;; override default and specify the arguments to the constructor
+     ;;; protocol clause
+     (define-record-type point
+       (fields x y d)
+       (protocol
+        (lambda (new)
+          (lambda (x y)
+            (new x y (sqrt (+ (* x x) (* y y)))))))
+       ;; 不支持多protocol
+       #;
+       (protocol
+        (lambda (new)
+          (lambda ()
+            (new 3 4 5)))))
+     (define p (make-point 3 4))
+     (point-x p)
+     (point-y p)
+     (point-d p) ;=> 5
+
+     ;;; has parent
+     (define-record-type cpoint
+       (parent point)
+       (fields color)
+       (protocol
+         (lambda (pargs->new)
+           (lambda (c x y)
+             ((pargs->new x y) c))))) 
+
+     (define cp (make-cpoint 'red 3 4))
+     (point-x cp) ;=> 3
+     (point-y cp) ;=> 4
+     (point-d cp) ;=> 5
+     (cpoint-color cp) ;=> red
+     ;; 只能有一个构造器
+     ;; (define cp (make-cpoint 4 3 'black))
+     (define-record-type cwpoint
+       (parent cpoint)
+       (fields weight)
+       (protocol (lambda (new)
+                   (lambda (w c x y)
+                     ;;; 深层继承，只关心父类构造函数
+                     ((new c x y) w)))))
+     (define cwp (make-cwpoint 12 'black 3 4))
+     (cwpoint-weight cwp)
+     #+END_SRC
 * 10. Libraries and Top-Level
   库使用带括号的语法命名，该语法包含一系列标识符，可选地后跟一个版本;
   实现通常将名称序列视为可以找到库的源代码或目标代码的路径，可能根源于主机文件系统中的某些标准位置集。
@@ -3659,7 +3881,21 @@ How might the primitive procedure list be-defined?
 *** procedure: (with-exception-handler procedure thunk) 
     returns: see below 
     libraries: (rnrs exceptions), (rnrs)
-
+    #+BEGIN_SRC scheme
+    (with-exception-handler
+     ;; procedure - exception handler
+     (lambda (condition)
+       (display condition)
+       ;; ...
+       )
+     ;; thunk - exception procedure
+     (lambda ()
+       ;; ...
+       (error 'test "throw error test" '(irritants))
+       )
+     )
+    #+END_SRC
+    
     #+BEGIN_SRC scheme
     (define (try thunk)
       (call/cc
@@ -3702,6 +3938,171 @@ How might the primitive procedure list be-defined?
     #+END_SRC
 ** 11.2.Defining Condition Types
    虽然程序可以传递raise或raise-continuable任何Scheme值，但描述异常情况的最佳方法通常是创建并传递条件对象。
+   - simple condition   ; single condition types
+   - compound condition ; multiple condition types
+   - syntax:&condition
+     a record-type name and the root of the condition-type hierarchy.
+   - procedure:(condition condition ...)
+     condition is used to create condition objects that may consist of multiple simple conditions.
+     Each argument condition may be simple or complex;
+     if simple, it is treated as a compound with itself as tis only simple condition.
+     The simple onditions of the result condition are the simple conditions of the condition arugments,
+     flattened into single list and appearing in order, with the simple conditions of the first condition
+     followed by the simple conditions of the second, and so on.
+     If the list has exactly one element, the result condtion may be simple or compound;
+*** procedure:(simple-conditions condition)
+    returns: a list of the simple conditions of condition
+*** syntax:(define-condition-type name parent constructor pred field ...)
+    - name,parent,... ;identifiers
+    - field ;(field-name accessor-name)
+      + field-name ; identifier
+      + accessor-name ; identifier
+   #+BEGIN_SRC scheme
+   ;;(&condition)
+   (condition? cons)  ;=> #f
+   (condition? (make-error)) ;=> #t
+   (condition? (make-message-condition "oops")) ;=> #t
+   (condition? (condition
+                (make-error)
+                (make-message-condition "no such element"))) ;=> #t
+   ;;; procedure: (condition condition ...)
+   ;;; returens: a condition, possible compound
+   ;;; libraries: (rnrs conditions),(rnrs)
+   (condition)
+   (condition (make-error)
+              (make-message-condition "oops")) ;=> compound condition
+   (define-record-type (&xcond make-xcond xcond?) (parent &condition))
+   (xcond? (make-xcond)) ;=> #t
+   (xcond? (condition (make-xcond))) ;=> #t
+   (xcond? (condition)) ;=>#f
+   (xcond? (condition (make-error) (make-xcond))) ;=>#f
+
+   ;;; (simple-conditions condition)
+   (simple-conditions (condition))
+   (simple-conditions (make-error))
+   (simple-conditions (condition (make-error))) ;=>(#<condition &error>)
+   (simple-conditions (condition (make-error)
+                                 (make-message-condition "oops"))) ;=>(#<condition &error> #<condition &message)
+   (let ([c1 (make-error)]
+         [c2 (make-who-condition "f")]
+         [c3 (make-message-condition "invalid arugments")]
+         [c4 (make-message-condition "error occurred while reading from file")]
+         [c5 (make-irritants-condition '("a.ss"))])
+     (equal? (simple-conditions
+              (condition (condition (condition c1 c2) c3)
+                         (condition c4 (condition c5))))
+             (list c1 c2 c3 c4 c5))) ;=> #t
+
+   ;;; (define-condition-type ...)
+   (define-condition-type &mistake &condition make-mistake mistake?
+     (type mistake-type))
+   (mistake? 'booooo) ;=> #f
+   (define c1 (make-mistake 'spelling))
+   (mistake? c1)
+   (mistake-type c1)
+   (define c2 (condition c1 (make-irritants-condition '(eggregius))))
+   (mistake? c2) ;=> #t
+   (mistake-type c2) ;=> spelling
+   (irritants-condition? c2) ;=> #t
+   (condition-irritants c2) ;=> (eggregius)
+   #+END_SRC
+** 11.3.Standard Condition Types
+   - &serious ; 严重
+     (make-serious-condition)
+     (serious-condition? obj)
+   - &violation ; 违例
+     Conditions of this type indicate that the program has violated some requirement, 
+     usually due to a bug in the program.
+   - &assertion ; 断言
+     a specific violation in which the program has passed the wrong number or types of arguments
+     to a procedure.
+   - &error ; 错误
+     error has occured with the program's interaction with its operating environment,
+     such as the failure of an attempt to open a file.
+   - &warning ; 警告
+     do not prevent the program continuing its execution but, in some cases, might result in a
+     more serous problem at some later point.
+   - &message ; 消息
+     usually included with a &warning condition or one of the &serious
+   - &irritants ; 刺激物，诱发因素
+     usually included with a &message condition
+   - &who ; 谁发出的
+     usually included with a &message condition
+     identify the syntactic form or procedure that detected the error.
+     a symbol or string.
+   - &non-continuable ; 不可继续
+     a non-continuable violation has occurred.
+     raise
+   - &implementation-restriction ; 超出范围
+     attempted to exceed some limitation int the implementation.
+   - &lexical ; 词法错误
+     such as mismatched parentheses, an invalid character appearing within a numberic contant.
+   - &syntax ; 语法错误
+     most syntax errors are detected by the macro expander.
+   - &undefined ; 未定义错误
+   - &i/o
+     Conditions of this type typically occur as one of the more specific subtypes described below.
+   - &i/o-read
+   - &i/o-write
+   - &i/o-invalid-position
+   - &i/o-filename
+   - &i/o-file-protection
+   - &i/o-file-is-read-only
+   - &i/o-file-already-exists
+   - &i/o-file-doesnot-exist
+   - &i/o-port
+     usually included with a condition of one of the other &i/o subtypes
+   - &i/o-decoding
+   - &i/o-encoding
+   - &no-infinities
+   - &no-nans
+
+** 11.x.summary
+   - 概念
+     - exceptions 程序异常
+     - conditions 异常描述对象
+       当发生异常时，使用condition来表述一个异常，condition是可以组合的，用于增强condition的表达能力
+       - &condition
+         一个记录类型
+         所有condition的父类
+       - (define-condition-type name parent constructor pred field ...) ;自定义condition
+       - 标准condition(异常状态记录)         
+     - 抛出机制
+       - raise ; 不可恢复异常
+         不可恢复到捕获区域内的后续处继续执行
+         - 便利封装
+           - (error who msg irritant ...)
+           - (assertion-violation who msg irritant ..)
+           - (assertion expression)
+           - (syntax-violation who msg form [subform])
+       - raise-continuable ;可恢复异常
+         可恢复到捕获区域内后续处继续执行
+     - 捕获机制
+       (生产(raise))       (调度)                    （消费）
+       (body) --> (with-exception-handler/guard) --> (handler)
+         \-<-------(raise-continuable)----------------/
+       
+       - (with-exception-handler procedure thunk)
+         适合简单的捕获
+       - (guard (condition clause1 clause2 ...) b1 b2 ...)
+         复杂的捕获
+   - 流程
+     - 默认
+       scheme 提供一个默认异常处理机制
+     - 主动捕获处理
+       - (with-exception-handler (lambda (condition) ...)
+                                 (lambda () ...))
+       - (guard (condition [(error? condition) ...]
+                           [ ... ])
+                exp1 exp2 ...)
+   - 扩展
+     - 实现一个异常状态描述库
+       - 将异常状态格式化到流
+       - 支持多种格式化类型
+         - 字符串
+         - Json
+         - scheme-forms
+     - 与日志系统有机集合
 * 12. Extended Examples
 ** 12.11. Multitasking with Engines
    - use case
@@ -3770,3 +4171,10 @@ How might the primitive procedure list be-defined?
    (complete-engine fac-recur-tail 10)
    (complete-engine fac-recur-tail 200)
    #+END_SRC
+
+* chez-bee plans
+** src
+   - bee ; (library bee)
+     - inspector ; object inspector
+     - trace     ; logic trace, like log
+     - system-extentions ; system inter face extentions
