@@ -629,17 +629,316 @@ ln -s ${bin}/petite ${bin}/${app}
    ;; #t
    #+END_SRC
 ** 4.3.Calling into Scheme
-   将scheme接口被C/C++ ... 调用
-   - *(foreign-callable conv ... proc-exp (param-type ...) res-type)  is-syntax*
+   将scheme接口被C/C++ 等外部语言调用
+   - (foreign-callable/foreign-procedure)混合调用，在涉及到continuations时会比较复杂
+   - (foreign-callable conv ... proc-exp (param-type ...) res-type) ; 将procedure转换为外部调用对象
      return: a code object
+     #+BEGIN_SRC scheme
+     (let ([x (foreign-callable
+               (lambda (x y) (pretty-print (cons x (* y 2))))
+               (string integer-32)
+               void)])
+       ;; 锁住对象，使其脱离内存管理机制
+       (lock-object x)
+       ;; 返回调用入口点
+       (foreign-callable-entry-point x))
+     ;; 应该保留x，在不需要时解锁
+     #+END_SRC
      - proc-exp
        a procedure is to be invoked by foreign code.
+   - (foreigh-callable-entry-point code) ; 将(foreigh-callable ...)对象转换为函数指针
+   - (foreign-callable-code-object address) ; 将函数指针转换为对应的 外部过程对象；
+   - example
+     #+BEGIN_SRC c
+     #include <stdio.h>
+
+     typedef void (*CB)(char);
+     CB callbacks[256] = {0};
+
+     void cb_init(void){
+             int i;
+             for(i=0; i<256; ++i){
+                     callbacks[i] = (CB)0;
+             }
+     }
+
+     void register_callback(char c, CB cb){
+             callbacks[c] = cb;
+     }
+
+     void event_loop(void){
+             CB f;
+             char c;
+             for(;;){
+                     c = getchar();
+                     if (c == EOF){
+                             break;
+                     }
+                     f = callbacks[c];
+                     if(f){
+                             f(c);
+                     }
+             }
+     }
+     #+END_SRC
+     #+BEGIN_SRC scheme
+     (define cb-init
+       (foreign-procedure "cb_init" () void))
+     (define register-callback
+       (foreign-procedure "register_callback" (char void*) void))
+     (define event-loop
+       (foreign-procedure __collect_safe "event_loop" () void))
+
+     (define callback
+       (lambda (p)
+         (let ([code (foreigh-callable __collect_safe p (char) void)])
+           (lock-object code)
+           (foreign-callable-entry-point code))))
+
+     (define ouch
+       (callback
+        (lambda (c)
+          (printf "Ouch! Hit by '~c'~%" c))))
+     (define rats
+       (callback
+        (lambda (c)
+          (printf "Rats! received '~c'~%" c))))
+
+     (cb-init)
+     (register-callback #\a ouch)
+     (register-callback #\c rats)
+     (register-callback #\e ouch)
+     (event-loop)
+     ;;> a
+     ;;Ouch! Hit by 'a'
+     ;;> c
+     ;;Rats! Received 'c'
+     ;; d
+     ;; e
+     ;; Ouch! Hit by 'e'
+     #+END_SRC
+   - summary
+     ; C接口转过程
+     C -----> foreigh-procedure -------> procedure
+     ; 过程转C接口1
+     procedure --------> foreigh-callable ---(lock-object)---> entry-point ------> C
+     ; c接口1对象释放
+     entry-point ------> foreigh-callable-code-object ------(unlock-object) ---> (release-object)
 ** 4.4.Continuations and Foreign Calls
+   #+BEGIN_SRC scheme
+   (define with-exit-proc
+     (lambda (p)
+       (define th (lambda () (call/cc p)))
+       (define-ftype ->ptr (function () ptr))
+       (let ([fptr (make-ftype-pointer ->ptr th)])
+         (let ([v ((ftype-ref ->ptr () fptr))])
+           (unlock-object
+             (foreign-callable-code-object
+               (ftype-pointer-address fptr)))
+           v))))
+   #+END_SRC
 ** 4.5.Foreign Data
-   *(foreign-alloc)*
-   *(foreign-free)*
-   *(foreign-sizeof)*
-   *(foreigh-ref type address offset)*
+   - introduction ; 注意安全
+     如何直接创建和操作外部数据（驻留在Scheme堆外的数据）
+     (foreigh-alloc/foreigh-sizeof)是安全的，其他的都不安全
+     *错误使用这些过程，将导致错误的内存引用、破坏数据甚至系统崩溃*
+
+     外部数据包括：数据结构、联合、数组、bit字段；相比过程接口更安全；
+   - (foreign-alloc n) ; = void* malloc(size_t n)
+     返回：n字节空间的地址，地址是符合底层硬件需求的字节对齐的；
+     如果分配失败，则抛出&assertion异常；
+   - (foreign-free address) ; = free(void*)
+     释放由(foreign-alloc n)分配的内存空间
+   - (foreigh-ref type address offset) ; (type*)address[offset]
+     - type '(short unsigned-short int unsigned unsigned-int long ...)
+   - (foreigh-set! type address offset value) ; *((type)&address[offset]) = value
+   - (foreign-sizeof type) ; sizeof(type)
+   - (define-ftype ftype-name ftype)
+     (define-ftype (ftype-name ftype) ...)
+     
+     ftype-name
+     (struct (field-name ftype) ...)
+     (union (field-name ftype) ...)
+     (array length ftype)
+     (* ftype)
+     (bits (field-name signedness bits) ...) ; bit=uint
+     (function conv ... (ftype ...) ftype) ; conv=[#f|__cdecl|...]
+     (packed ftype)
+     (unpacked ftype)
+     (endian endianness ftype) ; endian=[big|little]
+
+     函数外部类型不能被用于 field names, array elements;
+                只能用于顶层类型
+     函数指针可以嵌入其中；
+     #+BEGIN_SRC scheme
+     ;;; 定一个字节拷贝函数类型
+     (define-ftype bvcopy_t (function (u8* u8* size_t) void))
+     ;;; 指针类型(*)
+     (define-ftype A
+       (struct
+        [x int]
+        ;; 函数指针可以作为struct,union,array的成员
+        [f (* (function (u8* u8* size_t) void))]))
+     ;;; <==>
+     (define-ftype A
+       (struct
+        [x int]
+        ;; 函数指针可以作为struct,union,array的成员
+        ;; 函数本身不行 [f bvcopy_t] 是错误的
+        [f (* bvcopy_t)]))
+
+     ;;; 定义一个数据结构
+     (define-ftype F (function (wchar_t int) int))
+     (define-ftype A (array 10 wchar_t))
+     (define-ftype E
+       (struct
+        [a int]
+        [b double]
+        [c (array 25
+                  (struct
+                   [a short]
+                   [_ long]
+                   [b A]))]
+        [d (endian big
+                   (union
+                    [v1 unsigned-32]
+                    [v2 (bits
+                         [hi unsigned 12]
+                         [lo unsigned 20])]))]
+        [e (* A)]
+        [f (* F)]))
+     #+END_SRC
+   - (ftype-sizeof ftype-name) ; sizeof(ftype)
+     #+BEGIN_SRC scheme
+     (define-ftype B
+       (struct
+        [b1 integer-32]
+        [b2 (array 10 integer-32)]))
+     (ftype-sizeof B)
+     (define-ftype BPointer (* B))
+     (ftype-sizeof BPointer)
+     #+END_SRC
+   - (make-ftype-pointer ftype-name expr) ; 关联内存
+     #+BEGIN_SRC scheme
+     (define-ftype E
+       (struct
+        [i int]
+        [d double]))
+     (make-ftype-pointer E #x80000000)
+     (make-ftype-pointer E (foreign-alloc (ftype-sizeof E)))
+
+     ;;; 函数指针,代替(foreign-callable)的替代方案，用于封装procedure的C接口
+     (define fact
+       (lambda (n)
+         (if (= 0 n) 1 (fact (- n 1)))))                  ; 创建procedure
+     (define-ftype fact_t (function (int) int))           ; 创建函数类型
+     (define fact-fpter (make-ftype-pointer fact_t fact)) ; 创建C调用接口
+     (locked-object? fact-fpter)                          ; 检测是否锁定对象
+     (unlock-object (foreigh-callable-code-object
+                     (ftype-pointer-address fact-fpter))) ; 释放函数对象
+
+     ;;; 从C接口创建函数指针
+     (define-ftype bvcopy_t (function (u8* u8* size_t) void))
+     (define bvcopy_fptr (make-ftype-pointer bvcopy_t "memcpy"))
+     ;;; <==>
+     (define bvcopy_fptr (make-ftype-pointer bvcopy_t (foreign-entry "memcpy")))
+
+     #+END_SRC
+   - (ftype-pointer? [ftype-name] obj)
+     #+BEGIN_SRC scheme
+     (define-ftype Widget1 (struct [x int] [y int]))
+     (define-ftype Widget2 (struct [w Widget1] [b boolean]))
+     (define x1 (make-ftype-pointer Widget1 #x80000000))
+     (define x2 (make-ftype-pointer Widget2 #x80000000))
+     (ftype-pointer? x1) ;#t
+     (ftype-pointer? x2) ;#t
+     (ftype-pointer? Widget1 x1) ;#t
+     (ftype-pointer? Widget1 x2) ;#t
+     (ftype-pointer? Widget2 x1) ;#f
+     (ftype-pointer? Widget2 x2) ;#t
+     (ftype-pointer? #x80000000) ;#f
+     (ftype-pointer? Widget1 #x80000000) ;#f
+     #+END_SRC
+   - (ftype-pointer-address fptr) ; 从fptr获取物理地址，(make-ftype-pointer) 的逆操作
+     #+BEGIN_SRC scheme
+     (define-ftype E
+       (struct
+        [x int]
+        [y double]))
+     (define x (make-ftype-pointer E #x80000000))
+     (ftype-pointer-address x) ;#x80000000
+     #+END_SRC
+   - (ftype-pointer=? fptr1 fptr2) ; 比较2指针地址是否相等
+   - (ftype-pointer-null? fptr) ;判断空指针
+   - (ftype-&ref ftype-name (a ...) fptr-expr [index])
+   - (ftype-set! fytpe-name (a ...) fptr-expr [index] val-expr)
+   - (ftype-ref ftype-name (a ...) fptr-expr [index])
+     #+BEGIN_SRC scheme
+     (define-ftype bvcopy_t (function (u8* u8* size_t) void))
+     (define bvcopy-fptr (make-ftype-pointer bvcopy_t "memcpy"))
+     (define bvcopy (ftype-ref bvcopy_t () bvcopy-fptr))
+     (define bv1 (make-bytevector 8 0))
+     (define bv2 (make-bytevector 8 57))
+     (bvcopy bv1 bv2 5)
+     bv1 ;#vu8(57 57 57 57 57 0 0 0)
+     ;;; alternative to (foreign-procedure ...)
+     #+END_SRC
+   - (ftype-pointer-ftype fptr) ; 获取类型定义
+     #+BEGIN_SRC scheme
+     (define-ftype Q0
+       (struct
+        [x int]
+        [y int]))
+     (define-ftype Q1
+       (struct
+        [x double]
+        [y char]
+        [z (* Q0)]))
+     (define q1 (make-ftype-pointer Q1 0))
+     (ftype-pointer-ftype q1)
+     #+END_SRC
+   - (ftype-pointer-sexpr fptr) ; 获取数据结构的值
+     #+BEGIN_SRC scheme
+     (define-ftype Frob
+       (struct
+        [p boolean]
+        [q char]))
+     (define-ftype Snurk
+       (struct
+        [a Frob]
+        [b (* Frob)]
+        [c (* Frob)]
+        [d (bits
+            [_ unsigned 15]
+            [dx signed 17])]
+        [e (array 5 double)]))
+     (define x
+       (make-ftype-pointer Snurk
+                           (foreign-alloc (ftype-sizeof Snurk))))
+     (ftype-set! Snurk (b) x
+                 (make-ftype-pointer Frob
+                                     (foreign-alloc (ftype-sizeof Frob))))
+     (ftype-set! Snurk (c) x
+                 (make-ftype-pointer Frob 0))
+     (ftype-set! Snurk (a p) x #t)
+     (ftype-set! Snurk (a q) x #\A)
+     (ftype-set! Snurk (b * p) x #f)
+     (ftype-set! Snurk (b * q) x #\B)
+     (ftype-set! Snurk (d dx) x -2500)
+     (do ([i 0 (fx+ i 1)])
+         ((fx= i 5))
+       (ftype-set! Snurk (e i) x (+ (* i 5.0) 3.0)))
+     (ftype-pointer->sexpr x)
+     #||
+     (struct
+       [a (struct [p #t] [q #\A])]
+       [b (* (struct [p #f] [q #\B]))]
+       [c null]
+       [d (bits [_ _] [dx -2500])]
+       [e (array 5 3.0 8.0 13.0 18.0 23.0)])
+     ||#
+     #+END_SRC
+
 ** 4.6.Providing Access to Foreign Procedures
    - load-shared-object
    - Sforeign_symbol/Sregister_symbol [[4.8]]
@@ -653,22 +952,828 @@ ln -s ${bin}/petite ${bin}/${app}
          (error 'foreigh-entry "not foreign entry" foreign-entry?))
      (library-directories)
      #+END_SRC
-   - 
+   - (forgign-entry entry-name)
+     #+BEGIN_SRC scheme
+     (load-shared-object "libc.so.6")
+     (let ([addr (foreign-entry "strlen")])
+       (and (integer? addr) (exact? addr))) ;#t
+     (define-ftype strlen-type (function (string) size_t))
+     (define strlen
+       (ftype-ref strlen-type () (make-ftype-pointer strlen-type "strlen")))
+     (strlen "hey!")
+     ;;; <==>
+     ((foreign-procedure "strlen"
+                         (string) size_t)
+      "hey!")
+     #+END_SRC
+   - (load-shared-object path) ; 加载共享对象，如动态库
+     #+BEGIN_SRC scheme
+     ;;; Linux,FreeBSD,OpenBSD,OpenSolaris
+     (system "cc -fPIC -shared -o evenodd.so even.c odd.c")
+     ;;; Macos
+     (system "cc -dynamiclib -o evenodd.so even.c odd.c")
+     ;;; 32-bit Spark Solaris
+     (system "cc -KPIC -G -o evenodd.so even.c odd.c")
+     ;;; 64-bit Spark Solaris
+     (system "cc -xarch=v9 -KPIC -G -o evenodd.so even.c odd.c")
+     ;;; Window
+     (system "cl -c -DWIN32 even.c")
+     (system "cl -c -DWIN32 odd.c")
+     (system "link -dll -out:evenodd.so even.obj odd.obj")
 
+     ;;; load-shared-object
+     (load-shared-object "./evenodd.so")
+     (let ([odd (foreign-procedure "odd"
+                                   (integer-32) boolean)]
+           [even (foreign-procedure "even"
+                                    (integer-32) boolean)]
+           (list (even 100) (odd 100)))) ; (#t #f)
+     #+END_SRC
+   - (remove-forgeign-entry entry-name)
 ** 4.7.Using Other Foreign Language
+   #+BEGIN_SRC scheme
+   ;;; 使用前缀=来加载汇编文件
+   (foreign-entry? "foo") ;#f
+   (foreign-entry? "=foo") ;#t
+   #+END_SRC
 ** 4.8.C Library Routines
+   
 ** 4.9.Socket Operations
+   
 * 5.Binding Forms
-  
-   
-   
-* 函数表
+** 5.2.Multiple-value Definitions
+   - (define-vaules formals expr)
+     #+BEGIN_SRC scheme
+     (let ()
+       (define-values (x y) (values 1 2))
+       (list x y))
+     (begin
+       (define-values (x y . z) (values 1 2 3 4))
+       (list x y z))
+     #+END_SRC
+** 5.3.Recursive Bindings
+   (rec var expr)
+   #+BEGIN_SRC scheme
+   ;;; definition
+   (define-syntax rec
+     (syntax-rules ()
+       [(_ x e) (letrec ((x e) x))]))
 
-|--------------+----------------------+---+---|
-| load         | 现式(explicitly)加载 |   |   |
-| load-library | 现式加载加载库       |   |   |
-| import       | 隐式(implicitly)加载 |   |   |
+   (map (rec sum
+             (lambda (x)
+               (if (= x 0)
+                   0
+                   (+ x (sum (- x 1))))))
+        '(0 1 2 3 4 5))
+   (define cycle
+     (rec self
+          (list (lambda () self))))
+   (eq? ((car cycle)) cycle)
+   #+END_SRC
+** 5.4.Fluid Bindings
+   (fuild-let ((var expr) ...) body1 body2 ...)
+   #+BEGIN_SRC scheme
+   (let ([x 3])
+     (+ (fluid-let ([x 5])
+          x)
+        x)) ;8
+   (let ([x 'a])
+     (letrec ([f (lambda (y) (cons x y))])
+       (fluid-let ([x 'b])
+         (f 'c)))) ; (b . c)
+   (let ([x 'a])
+     (call/cc
+      (lambda (k)
+        (fluid-let ([x 'b])
+          (letrec ([f (lambda (y) (k '*))])
+            (f '*)))))
+     x)
 
+   ;;; may be defined
+   (define-syntax fluid-let
+     (lambda (x)
+       (syntax-case x ()
+         [(_ () b1 b2 ...) #'(let () b1 b2 ...)]
+         [(_ ((x e) ...) b1 b2 ...)
+          (andmap identifier? #'(x ...))
+          (with-syntax ([(y ...) (generate-temporaries #'(x ...))])
+                       #'(let ([y e] ...)
+                           (let ([swap (lambda ()
+                                         (let ([t x])
+                                           (set! x y)
+                                           (set! y t))
+                                         ...)])
+                             (dynamic-wind swap (lambda () b1 b2 ...) swap))))])))
+   #+END_SRC
+** 5.5.Top-Level Bindings
+   procedure: (define-top-level-value symbol obj)
+   procedure: (define-top-level-value symbol obj env)
+   等价与在顶层定义变量，只不过他允许在任意地方定义。
+   #+BEGIN_SRC scheme
+   (begin
+     (define-top-level-value 'xyz "hi")
+     xyz) ;"hi"
+   xyz ;"hi"
+   (let ([var 'xyz])
+     ;; 覆盖原来的'xyz顶层变量 xyz="mom"不再是"hi"
+     ;; 由于var 覆盖了xyz，故不存在顶层变量var
+     (define-top-level-value var "mom")
+     ;; var -> xyz, 被内部覆盖
+     (list var xyz)) ; (xyz "mom")
+   xyz ; "mom"
+   var ; Exception: variable var is not bound
+
+   ;;; (set-top-level-value! symbol obj)
+   ;;; (set-top-level-value! symbol obj env)
+   (let ([v (let ([cons list])
+              (set-top-level-value! 'cons +)
+              (cons 3 4))])
+     (list v (cons 3 4)))
+   (let ([cons +])
+     (list (cons 3 4) ; 使用+
+           ;;; 使用原来的顶层定义
+           ((top-level-value 'cons) 3 4))) ;(7 (3 . 4))
+
+   ;;; (top-level-bound? symbol [env])
+   (top-level-bound? 'xyz) ;#f
+   (begin
+     (define-top-level-value 'xyz 3)) ;bing 3 to 'xyz
+   (top-level-bound? 'xyz) ;#t
+   (top-level-bound? xyz) ;Exception in top-level-bound?: 3 is not a symbol
+   ;;; 绑定到特殊环境
+   (define e (copy-environment (interaction-environment)))
+   (define-top-level-value 'pi 3.14 e)
+   (top-level-bound? 'pi) ;#f
+   (top-level-bound? 'pi e) ;#t
+
+   ;;;(top-level-mutable? symbol [env])
+   (define e (copy-environment (interaction-environment) #f)) ;#f指定immutable
+   (top-level-mutable? 'xyz e) ;#f
+
+   ;;;(define-top-level-syntax ...)
+   #+END_SRC
+* 6.Control Structures
+** 6.1.Conditionals
+*** syntax:(exclusive-cond clause1 cluase2 ...)
+*** (case expr0 clause1 clause2 ...)
+*** (record-case expr cluase1 clause2 ...)
+    #+BEGIN_SRC scheme
+    (define calc
+      (lambda (x)
+        (record-case x
+                     [(add) (x y) (+ x y)]
+                     [(sub) (x y) (- x y)]
+                     [(mul) (x y) (* x y)]
+                     [(div) (x y) (/ x y)]
+                     [else (assertion-violation 'calc
+                                                "invalid expression"
+                                                x)])))
+    (calc '(add 3 4))
+    (calc '(div 3 4))
+    (calc '(not-exist 3 4))
+    #+END_SRC
+** 6.2.Mapping and Folding
+*** (ormap procedure list1 list2 ...) <==> exists
+*** (andmap prodedure list1 list2 ...) <==> for-all
+** 6.3.Continuations
+*** (call/1cc procedure)
+*** (dynamic-wind in body out)
+    (dynamic-wind critical? in body out)
+** 6.4.Engines
+*** (make-engine trunk)
+*** (engine-block)
+*** (engine-return obj ...)
+* 7.Operations on Objects
+** 7.1.Missing R6RS Type Predicates
+**** (enum-set? obj)
+**** (record-constructor-descriptor? obj)
+** 7.2.Pairs and Lists
+**** (atom? obj) <==>(lambda (obj) (not (pair? x)))
+     returns:#t if obj not a pair, #f otherwise
+**** (list-head list n)
+     returns: a list of the first n elements of list
+**** (last-pair list)
+     returns: the last pair of a list
+**** (list-copy list)
+**** (list* obj ... final-obj) <==> cons*
+     returns: a list of obj ... terminated by final-obj
+**** (make-list n [obj])
+**** (iota n)
+     returns: a list of integers from 0(inclusive) to n(exclusive)
+     #+BEGIN_SRC scheme
+     (iota 5) ;(0 1 2 3 4)
+     #+END_SRC
+**** (enumerate ls)
+     returns: a list of integers from 0 to the length of ls(exclusive)
+     #+BEGIN_SRC scheme
+     (enumerate '(a b c)) ;(0 1 2)
+     (enumerate '(x y z m n)) ;(0 1 2 3 4)
+     #+END_SRC
+
+** 7.8.Boxes
+*** (box? obj)
+*** (box obj)
+    (box-immutable obj)
+    #+BEGIN_SRC scheme
+    (box 'a)
+    #+END_SRC
+*** (unbox obj)
+    #+BEGIN_SRC scheme
+    (define box-a (box 'a))
+    (unbox box-a)
+    (unbox (box (box '(a b c))))
+    #+END_SRC
+*** (set-box! box obj)
+*** (box-cas! box old-obj new-obj)
+    #+BEGIN_SRC scheme
+    (define box-old (box 'old))
+    (box-cas! box-old 'old 'new)
+    box-old
+    (unbox box-old)
+    (box-cas! box-old 'other 'wrong)
+    (unbox box-old)
+    #+END_SRC
+** 7.9.Symbols
+*** (gensym)
+    #+BEGIN_SRC scheme
+    (gensym)
+    (gensym "pretty")
+    (gensym "pretty" "unique")
+    (parameterize ([print-gensym 'pretty])
+                  (write (gensym)))
+    #+END_SRC
+** 7.10.Void ;替代unspecified
+   #+BEGIN_SRC scheme
+   (if #t
+       (void)
+       (void))
+   (if #t
+       (void))
+   (if #t) ;Exception: invalid syntax (if #t)
+   #+END_SRC
+** 7.11.Sorting
+*** (sort predicate list) 
+    (sort! predicate list)
+    (list-sort)
+*** (merge predicate list1 list2)
+    (merge predicate list1 list2)
+** 7.12.Hashtables
+*** (hashtable-cell hashtable key default)
+*** (hashtable-values hashtable)
+** 7.16.Procedures
+*** (prodedure-arity-mask proc) ; 参数个数，不定参数为负数
+    #+BEGIN_SRC scheme
+    (procedure-arity-mask (lambda () 'none)) ;=> 1
+    (procedure-arity-mask car) ;=> 2
+    (procedure-arity-mask (case-lambda [() 'none] [(x) x])) ;=> 3
+    (procedure-arity-mask (lambda x x)) ;=> -1
+    (procedure-arity-mask (case-lambda [() 'none] [(x y . z) x])) ;=> -3
+    (procedure-arity-mask (case-lambda)) ;=> 0
+    (logbit? 1 (procedure-arity-mask pair?)) ;=> #t
+    (logbit? 2 (procedure-arity-mask pair?)) ;=> #f
+    (logbit? 2 (procedure-arity-mask cons)) ;=> #t
+    #+END_SRC
+* 9.Input/Output Operations
+* 12.System Operations
+** 12.1.Exceptions
+*** (warning who msg irritant ...)
+    warning raise a *continuable* exception.
+*** (assertion-violationf who msg irritant ...)
+*** (errorf who msg irritant ...)
+*** (warningf who msg irritant ...)
+    后缀f，表示msg可以为格式化字符串
+    #+BEGIN_SRC scheme
+    (let ([x 0]
+          [y 1])
+      (warningf 'wf "format ~s ~s~%" x y)
+      (warning 'wf "no format" x y))
+    (display-condition "cond")
+    #+END_SRC
+** 12.2.Interrupts
+*** (break)
+*** (break who)
+*** (break who msg irritant ...)
+*** break-handler
+    (break-handler (lambda args (void))) ; disable breakspear
+*** keyboard-interrupt-handler
+    #+BEGIN_SRC scheme
+    (keyboard-interrupt-handler
+     (lambda ()
+       (newline (console-output-port))
+       (reset)))
+    #+END_SRC
+*** (set-timer n)
+*** timer-interrupt-handler
+    #+BEGIN_SRC scheme
+    (timer-interrupt-handler
+     (lambda ()
+       (printf "timer interrupt test~%")
+       (set-timer 1000)))
+    (set-timer 1000)
+    (printf "timer seted~%")
+    (printf "wait timer expires...~%")
+    #+END_SRC
+*** (with-interrupts-disable body1 body2 ...)
+    #+BEGIN_SRC scheme
+    (define-syntax with-interrupts-disable
+      (syntax-rules ()
+        [(_ b1 b2 ...)
+         (dynamic-wind
+             disable-interrupts
+             (lambda () b1 b2 ...)
+             enable-interrupts)]))
+    #+END_SRC
+*** (register-signal-handler sig procedure)
+    is supported only on Unix-based system
+** 12.3.Environments
+*** (environment? obj)
+    #+BEGIN_SRC scheme
+    (environment? (interaction-environment)) ;#t
+    (environment? 'interaction-environment) ;#f
+    (environment? (copy-environment (scheme-environment)))
+    (environment? (environment '(prefix (rnrs) $rnrs-)))
+    #+END_SRC
+*** (environment-mutable? env)
+    #+BEGIN_SRC scheme
+    (environment-mutalble? (interaction-environment)) ;#t
+    (environment-mutalble? (scheme-environment)) ;#f
+    (environment-mutalble? (copy-environment (shcme-environment))) ;#t
+    (environment-mutalble? (environment '(prefix (rnrs) $rnrs-))) ;#f
+    #+End_SRC
+*** (scheme-environment)
+    returns: an environment corresponds to the scheme module.
+    the environment returned by this procedure is immutable.
+*** (ieee-environment)
+*** interaction-environment
+*** (copy-environment env)
+*** (copy-environment env mutable?)
+*** (copy-environment env mutable? syms)
+*** (environment-symbols env)
+    #+BEGIN_SRC scheme
+    ;;; building the list of symbols to be copied from one environment to another.
+    (define listless-environment
+      (copy-environment
+       (scheme-environment)
+       #t
+       ;; 取消list符号
+       (remq 'list (environment-symbols (scheme-environment)))))
+    (eval '(let ([x (cons 3 4)]) x) listless-environment)
+    (eval '(list 3 4)
+          ;; 由于list符号被取消，将抛出异常
+          listless-environment)
+    #+END_SRC
+*** (apropos s)
+*** (apropos s env)
+*** (apropos-list s)
+*** (apropos-list s env)
+    列出保护*s*的库
+** 12.4.Compilation, Evaluation, and Loading
+*** (eval obj)
+*** (eval obj env)
+*** (current-eval)
+*** (compile obj)
+*** (compile obj env)
+*** (interpret obj)
+*** (interpret obj env)
+*** (load path)
+*** (load path eval-proc)
+*** (load-library path)
+*** (load-library path eval-proc)
+*** (load-program path)
+*** (load-porgram path eval-proc)
+*** (load-compiled-from-port input-port)
+*** (visit path)
+*** (revisit path)
+*** (compile-file input-file)
+*** (compile-file input-file output-filename)
+*** (compile-script input-filename)
+*** (compile-script input-filename output-filename)
+*** (compile-library input-file)
+*** (compile-library input-file output-filename)
+*** (compile-program input-filename)
+*** (compile-program input-filename output-filename)
+*** (maybe-compile-file input-filename)
+*** (maybe-compile-file input-filename output-filename)
+*** (maybe-compile-...)
+*** compile-library-handler
+*** compile-program-handler
+*** (compile-whole-program input-filename output-filename)
+*** (compile-whole-program input-filename output-filename libs-visiable?)
+*** (compile-whole-library input-filename output-filename)
+*** (compile-port input-port output-port)
+*** (compile-port input-port output-port sfd)
+*** (compile-port input-port output-port sfd wpo-port)
+*** (compile-to-port obj-list out-port)
+*** (compile-to-port obj-list out-port sfd)
+*** (compile-to-port obj-list out-port sfd wpo-port)
+*** (compile-to-file obj-list output-file)
+*** (compile-to-file obj-list output-file sfd)
+*** (make-boot-file output-filename base-boot-list input-filename ...)
+*** (make-book-header output-filename base-boot1 base-boot2 ...)
+*** (strip-fasl-file input-path output-path options)
+*** (fasl-strip-options symbol ...)
+*** (machine-type)
+*** (expand obj)
+*** (expand obj env)
+*** (current-expand)
+*** (sc-expand obj)
+*** (sc-expand obj env)
+*** (expand/optimize obj)
+*** (expand/optimize obj env)
+*** (eval-when situation form1 form2 ...)
+*** (eval-syntax-expanders-when)
+** 12.5.Source Directories and Files
+*** source-directories
+    load,load-library,load-program,include,visit,revisit search directory
+*** (with-source-path who name procedure)
+** 12.6.Compiler Controls
+*** optimize-level
+    (optimize-level [0|1|2|3])
+*** ($primitive varibale)
+*** ($primitive 2 variable)
+*** ($primitive 3 variable)
+*** (debug-level)
+*** (generate-interrupt-trap)
+*** (compile-interpret-simple)
+*** (generate-inspector-information)
+*** (generate-proceudre-source-information)
+*** (enable-cross-library-optimization)
+*** (generate-wpo-files)
+*** (compile-compressed)
+*** (compile-file-message)
+*** run-cp0
+*** cp0-effort-limit
+*** cp0...
+*** commonization-level
+*** undefined-variable-warnings
+*** expand-output
+*** expand/optimize-output
+*** (pariah expr1 expr2 ...)
+** 12.7.Profiling
+*** summary
+    two forms of profiling:
+    - source profiling
+      (profile exp)
+      - compile the code with source profiling enabled
+      - run the compiled code to generate source-profile information
+      - dump the profile information
+
+      (compile-profile [source|#t])
+      - profile-dump-html
+      - profile-dump-list
+      - profile-dump
+      - profile-dump-data
+
+      提供优化数据
+      - load(profile-load-data) the profile (profile-dump-data) informatino into the compiler's profile database
+      - recompile the code
+    - block profiling
+      optimization
+      - compile the code with block profiling enabled
+        (compile-profile [block|#t])
+      - run the code to generate block-profile information
+      - dump the profile information
+        (profile-dump-data)
+      - load the profile information
+        (profile-load-data)
+      - recompile the code
+    - example
+      #+BEGIN_SRC scheme
+      ;;; /tmp/fatfib/fatfib.ss
+      (define fat+
+        (lambda (x y)
+          (if (zero? y)
+              x
+              (fat+ (1+ x) (1- y))))) 
+
+      (define fatfib
+        (lambda (x)
+          (if (< x 2)
+              1
+              (fat+ (fatfib (1- x)) (fatfib (1- (1- x)))))))
+      #|
+      (parameterize ([compile-profile 'source])
+                    (load "/tmp/fatfib.ss"))
+      (fatfib 20) ;10946
+      (profile-dump-html)
+      |#
+      #;(fatfib 20)
+      ;;; --x <==> (1- x)
+      #;
+      (let ([x 3])
+        (1- x))
+      #+END_SRC
+** 12.8.Waiter Customization
+   - summary
+     waiter (REPL)
+     The waiter operates within a context called a cafe.
+     (noew-cafe) opens a new Scheme cafe, stacked on top of the old one.
+** 12.9.Transcript Files
+** 12.10.Times and Dates
+   - time type symboles
+     - time-utc
+     - time-motonic
+       单调时间
+     - time-duration
+       间隔时间，2时间点的差。
+     - time-process
+       当前进程使用的CPU时间量。
+     - time-thread
+       当前线程使用的CPU时间量。
+     - time-collector-cpu
+       垃圾收集器消耗的当前进程的CPU时间部分。
+     - time-collector-real
+       垃圾收集器消耗当前进程的实时部分。
+   - time-objects
+     5s10ns = 5000000010 ns = 5.000000010 sec
+     -5s10ns = -4999999990 ns = 4.999999990 sec
+     - second
+       exact integer
+     - nonosecond
+       nonnegative integer, less than 10^9
+   - date objects
+     - nanosecond
+     - second
+       nonnegative integer less than 62.(61,62 allow for leap seconds)
+     - minute
+       0~59
+     - hour
+       0~23
+     - day
+       1~31
+     - month
+       1~12
+     - year
+       > 0
+     - time zone
+       -864000 ~ 864000
+*** (current-time)
+*** (current-time time-type)
+    returns: a time object representing the current time
+    #+BEGIN_SRC scheme
+    (current-time) ; #<time-utc 1545448615.171003338>
+    (current-time 'time-process) ; #<time-process 0.271716877>
+    (current-time 'time-monotonic) ;#<time-monotonic 158137.623211930>
+    (current-time 'time-duration) ;#<time-duration 158166.046981587>
+    (current-time 'time-thread) ;#<time-thread 0.274790957>
+    (current-time 'time-collector-cpu) ;#<time-collector-cpu 0.001951815
+    (current-time 'time-collector-real) ;#<time-collector-cpu 0.001951815>
+    #+END_SRC
+*** (make-time type nsec sec)
+    returns: a time object
+    #+BEGIN_SRC scheme
+    (make-time 'time-utc 887234 13414134134)
+    (make-time 'time-duration 10 5)
+    (make-time 'time-duration 10 -5)
+    #+END_SRC
+*** (time? obj)
+    #+BEGIN_SRC scheme
+    (time? (current-time)) ;#t
+    (time? (make-time 'time-utc 0 0)) ;#t
+    (time? "1400 hours") ;#f
+    #+END_SRC
+*** (time-type time)
+*** (time-nanosecond time)
+*** (time-second time)
+    #+BEGIN_SRC scheme
+    (time-type (current-time)) ;time-utc
+    (time-type (current-time 'time-process)) ;time-process
+    (time-type (make-time 'time-duration 0 50)) ;time-duration
+    (time-second (current-time)) ;1545449189
+    (time-nanosecond (current-time)) ;123599824
+    #+END_SRC
+*** (set-time-type! time type)
+*** (set-time-nanosecond! time nesc)
+*** (set-time-second! time sec)
+
+*** (time=? time1 time2)
+*** (time>? time1 time2)
+*** (time>=? time1 time2)
+*** (time<? time1 time2)
+*** (time<=? time1 time2)
+    #+BEGIN_SRC scheme
+    (let ([t (current-time)])
+      (time=? t t)) ;#t
+    (let ([t (current-time)])
+      (let loop ()
+        (when (time=? (current-time) t)
+              (loop))
+        (time>? (current-time) t))) ;#t
+    #+END_SRC
+*** (copy-time time)
+    #+BEGIN_SRC scheme
+    (define t1 (current-time))
+    (define t2 (copy-time t1))
+    (eq? t1 t2) ;#f
+    (eqv? (time-second t2) (time-second t1)) ;#t
+    (eqv? (time-nanosecond t2) (time-nanosecond t1)) ;#t
+    #+END_SRC
+
+*** (time-difference time1 time2)
+*** (time-diference! time! time2)
+*** (add-duration time1 timed)
+*** (add-duration! time1 timed)
+*** (subtract-duration time timed)
+*** (substact-duration! time timed)
+
+*** (current-date)
+*** (current-date offset)
+    #+BEGIN_SRC scheme
+    (current-date) ;#<date Sat Dec 22 11:35:28 2018>
+    (current-date 0) ;#<date Sat Dec 22 03:36:08 2018>
+    (date-zone-name (current-date)) ;"CST"
+    (date-zone-name (current-date 0)) ;#f
+    #+END_SRC
+*** (make-date nsec sec min hour day mon year)
+*** (make-date nsec sec min hour day mon year offset)
+    #+BEGIN_SRC scheme
+    (make-date 0 0 0 0 1 1 1970 0) ;#<date Thu Jan  1 00:00:00 1970>
+    #+END_SRC
+*** (date? obj)
+    #+BEGIN_SRC scheme
+    (date? (current-date)) ;#t
+    (date? (make-date 0 0 1 1 1 1 4000 0)) ;#t
+    (date? "sun sep 23 09:07:30 2007") ;#t
+    #+END_SRC
+*** (date-nanosecond date)
+*** (date-second date)
+*** (date-minute date)
+*** (date-hour date)
+*** (date-day date)
+*** (date-month date)
+*** (date-year date)
+*** (date-zone-offset date)
+*** (date-week-day date)
+*** (date-year-day date)
+*** (date-dst? date)
+*** (date-zone-name date)
+    #+BEGIN_SRC scheme
+    (date-zone-name (current-date)) ;"CST"
+    #+END_SRC
+*** (time-utc->date time)
+*** (time-utc->date time offset)
+*** (date->time-utc date)
+*** (date-and-time)
+*** (date-and-time date)
+    #+BEGIN_SRC scheme
+    (date-and-time) ;"Sat Dec 22 11:45:04 2018"
+    (current-date) ;#<date Sat Dec 22 11:45:17 2018>
+    #+END_SRC
+*** (sleep time)
+    #+BEGIN_SRC scheme
+    (begin
+      (display "begin sleep 1.5 seconds...\n")
+      (sleep (make-time 'time-duration 50000000 1))
+      (display "wakeup.\n"))
+    #+END_SRC
+** 12.11.Timing and Statistics
+*** (time expr)
+    #+BEGIN_SRC scheme
+    ;;; 计时器
+    (time (collect))
+    #+END_SRC
+*** (display-statistics)
+*** (display-statistics textual-output-port)
+    #+BEGIN_SRC scheme
+    (display-statistics)
+    #+END_SRC
+*** (cpu-time)
+    returns: the amount of cpu time consumed since system start-up
+    #+BEGIN_SRC scheme
+    (cpu-time)
+    (real-time)
+    #+END_SRC
+*** (real-time)
+*** (bytes-allocated)
+*** (bytes-allocated g)
+    returns: the number of bytes currently allocated
+*** (initial-bytes-allocated)
+*** (bytes-deallocated)
+*** (current-memory-bytes)
+*** (maximum-memory-bytes)
+*** (reset-maxmum-memory-bytes!)
+*** (collections)
+*** (statistics)
+    #+BEGIN_SRC scheme
+    (statistics)
+    #+END_SRC
+*** (make-sstats cpu real bytes gc-count gc-cpu gc-real gc-bytes)
+*** (sstats? obj)
+*** (enable-object-counts)
+*** (object-counts)
+** 12.12.Cost Centers
+*** generate-allocation-counts
+*** generate-instruction-counts
+*** (make-cost-center)
+*** (const-center? obj)
+*** (with-cost-center cost-center trunk)
+*** (with-cost-center timed? cost-center trunk)
+*** (cost-center-instuction-count cost-center)
+*** (cost-center-allocation-count cost-center)
+*** (cost-center-time cost-center)
+*** (reset-cost-center! cost-center)
+** 12.13.Parameters
+*** (make-parameter object)
+*** (make-parameter object procedure)
+    returns a parameter(procedure)
+    - object
+      initial value of the internal variable
+    - procedure
+      a filter, (lambda filter (arg) ...)
+    - example
+      #+BEGIN_SRC scheme
+      (define print-length
+        (make-parameter
+         #f
+         (lambda (x)
+           (unless (or (not x) (and (fixnum? x) (fx>= x 0)))
+                   (assertion-violationf 'print-length
+                                         "~s is not a positive fixnum or #f"
+                                         x))
+           x)))
+      (print-length)
+      (print-length 3)
+      (print-length)
+      (format "~s" '(1 2 3 4 5 6))
+      (print-length #f)
+      (format "~s" '(1 2 3 4 5 6))
+
+      ;;; case-lambda
+      (define make-parameter
+        (case-lambda
+         [(init guard)
+          (let ([v (guard init)])
+            (case-lambda
+             [() v]
+             [(u) set! v (guard u)]))]
+         [(init)
+          (make-parameter init (lambda (x) x))]))
+      #+END_SRC
+*** (parameterize ((param expr) ...) body1 body2 ...)
+    returns the values of the body
+    #+BEGIN_SRC scheme
+    (define test
+      (make-parameter 0))
+    (test) ;0
+    (test 1)
+    (test) ;1
+    (parameterize
+     ([test 2])
+     (test)) ;2
+    (test) ;1
+    (define k (lambda (x) x))
+    (begin (set! k (call/cc k))
+           'k)
+    k
+    (parameterize ([test 2])
+                  (test (call/cc k))
+                  (test));k
+    (test);1
+    (k 3);3
+    (test) ;1
+    (k 4);4
+    #+END_SRC
+** 12.14.Virtual registers
+   #+BEGIN_SRC scheme
+   ;;; fast than variable
+   (define-syntax current-state
+     (identifier-syntax
+      [id (virtual-register 0)]
+      [(set! id e) (set-virtual-register! 0 e)]))
+   current-state
+   (set! current-state 'start)
+   current-state
+   #+END_SRC
+*** (virutal-register-count)
+    returns the number of virtual registers
+    #+BEGIN_SRC scheme
+    (virtual-register-count);16
+    #+END_SRC
+*** (set-virtual-register! k x)
+*** (virtual-register k)
+** 12.16.Environment Queries and Settings
+*** (scheme-version)
+    #+BEGIN_SRC scheme
+    (scheme-version) ;"Chez Scheme Version 9.5.1"
+    (scheme-version-number) ;9
+                            ;5
+                                            ;1
+    (petite?) ;#f
+    (threaded?);#f
+    (interactive?);#t
+    (get-process-id);27928
+    (getenv "HOME")
+    ;;;(putenv key value)
+    ;;;(get-registry key)
+    ;;;(put-registry! key val)
+    ;;;(remove-registry! key)
+    #+END_SRC
+** 12.16.Subset Modes
+*** subset-mode
+    #+BEGIN_SRC scheme
+    (subset-mode system)
+    (subset-mode #f)
+    #+END_SRC
 * 生词表
 Top-level bindings are *convenient and appropriate* during program development,
 , since they simplify testing, redefinition, and tracing of *individual* proc-
