@@ -1234,6 +1234,103 @@ ln -s ${bin}/petite ${bin}/${app}
     (logbit? 2 (procedure-arity-mask cons)) ;=> #t
     #+END_SRC
 * 9.Input/Output Operations
+** 9.1.Generic Ports
+   - tree
+     - mode
+       - port
+         - buffer
+           - buffer-size
+           - buffer-index
+     - standard message
+       - message name
+         - type:symbol
+       - messages for build-in ports
+         - block-read port string count
+         - block-write port string count
+         - char-ready? port
+         - clear-input-port port
+         - clear-output-port port
+         - close-port port
+         - file-position port
+         - file-position port position
+         - file-length port
+         - flush-output-port port
+         - peek-char port
+         - port-name port
+         - read-char port
+         - uncread-char char port
+         - write-char char port
+     - generic-port
+       - construction
+         - (make-input-port)
+         - (make-output-port)
+         - (make-input/output-port)
+       - fields
+         - handler
+         - output-buffer
+         - output-size
+         - output-index
+         - input-buffer
+         - input-size
+         - input-index
+** 9.2.File Options
+   - compressed
+   - replace
+   - exclusive
+   - append
+   - perm-set-user-id
+   - perm-set-group-id
+   - perm-sticky
+   - perm-no-user-write
+   - perm-user-execute
+** 9.3.Transcoders
+   - utf-16le-codec
+   - utf-16be-codic
+   - iconv-codec
+** 9.4.Port Operatsions
+*** (make-input-port handler input-buffer)
+*** (make-output-port handler output-buffer)
+*** (make-input/output-port handler input-buffer output-buffer)
+    returns a new textual port
+*** (prot-handler port)
+    return the handler
+** 9.17.Generic Port Examples
+*** Two-way ports
+    #+BEGIN_SRC scheme
+    (define make-two-way-port
+      (lambda (ip op)
+        (define handler
+          (lambda (msg . args)
+            (record-case (cons msg args)
+              [block-read (p s n) (block-read ip s n)]
+              [block-write (p s n) (block-write op s n)]
+              [char-ready? (p) (char-ready? ip)]
+              [clear-input-port (p) (clear-input-port ip)]
+              [clear-output-port (p) (clear-output-port op)]
+              [close-port (p) (mark-port-closed! p)]
+              [flush-output-port (p) (flush-output-port op)]
+              [file-position (p . pos) (apply file-position ip pos)]
+              [file-length (p) (file-length ip)]
+              [peek-char (p) (peek-char ip)]
+              [port-name (p) "two-way"]
+              [read-char (p) (read-char ip)]
+              [unread-char (c p) (unread-char c ip)]
+              [write-char (c p) (write-char c op)]
+              [else (assertion-violationf 'two-way-port
+                      "operation ~s not handled"
+                      msg)])))
+        (make-input/output-port handler "" "")))
+    (define ip (open-input-string "this is the input"))
+    (define op (open-output-string))
+    (define p (make-two-way-port ip op))
+    (port? p)
+    (input-port? p)
+    (output-port? p)
+    (textual-port? p)
+    (read p)
+    (write 'hello p)
+    (get-output-string op)
+    #+END_SRC
 * 12.System Operations
 ** 12.1.Exceptions
 *** (warning who msg irritant ...)
