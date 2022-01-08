@@ -1,15 +1,191 @@
-#+TITLE The Scheme Programming Language Learning Note
-#+AUTHOR R. Kent Dybvig
+#+TITLE: The Scheme Programming Language Learning Note
+#+AUTHOR: R. Kent Dybvig
+#+STARTUP: indent
 
 * Preface(序言)
+https://www.scheme.com/tspl4/
+Scheme was introduced in 1975
+First dialect of List of full support:
+- lexical scoping
+- first-class procedures
+- continuations
+
 * 1. Introduction(引言)
-** 1.Scheme Syntax(语法)
+** Introduction
+Scheme is a general-purpose computer programming language.
+It is a high-level language,
+While Scheme is often identified with symbolic applications, 
+its rich set of data types and flexible control structures make it a truly versatile language. 
+*** Employed to write:
+- text editors, 
+- optimizing compilers, 
+- operating systems, 
+- graphics packages, 
+- expert systems, 
+- numerical applications, 
+- financial analysis packages, 
+- virtual reality systems, 
+- and practically every other type of application imaginable.
+*** Value supports
+Scheme supports many types of data values, or objects, 
+including characters, strings, *symbols*, lists or vectors of objects, and a full set of numeric data types, 
+including *complex, real, and arbitrary-precision rational numbers*.
+*** Memory Manager
+Typically by a *garbage collector* that periodically recovers the storage used by inaccessible objects.
+Simple atomic values, such as small integers, characters, booleans, and the empty list, 
+are typically represented as *immediate values* and thus incur *no allocation or deallocation overhead*.
+*** Objects are First-class data values
+because they are retained indefinitely, 无限期保留
+they may be passed freely as arguments to procedures, 它们可以作为参数自由传递给过程
+returned as values from procedures, 作为过程的值返回
+and combined to form new objects. 组合成新的物体
+
+This is in contrast with many other languages where composite data values 对比其他语言
+such as arrays are either statically allocated and never deallocated, 静态分配,从不释放
+allocated on entry to a block of code and unconditionally deallocated on exit from the block, 在进入代码块时分配，在退出代码块时无条件地释放
+or explicitly allocated and deallocated by the programmer. 由程序员显式地分配和释放。
+*** Scheme is a call-by-value 值调用语言
+These pointers remain behind the scenes, 
+however, and programmers need not be conscious of them except to understand that the storage for an object is 
+not copied when an object is passed to or returned from a procedure. 当向过程传递对象或从过程返回对象时，不会复制对象
+*** Small core of *syntacti*c forms 小核心语法
+These core forms, a set of extended syntactic forms derived from them, 从它们衍生出来的一组扩展的句法形式
+and a set of primitive procedures make up the full Scheme language. 一组基本过程构成了完整的Scheme语言
+
+An interpreter or compiler for Scheme can be quite small and potentially fast and highly reliable. 
+Scheme的解释器或编译器可以非常小，而且可能非常快和高可靠。
+
+The extended syntactic forms and many primitive procedures can be defined in Scheme itself, simplifying the implementation and increasing reliability.
+扩展的语法形式和许多原始过程可以在Scheme中定义，从而简化了实现，提高了可靠性。
+*** Printed *representation*
+Scheme programs share a common printed representation with Scheme data structures.
+Scheme程序与Scheme数据结构共享一个公共的打印表示。
+As a result, any Scheme program has a natural and obvious internal representation as a Scheme object. 
+因此，任何Scheme程序都具有作为Scheme对象的自然和明显的内部表示。
+
+For example, 
+variables and syntactic keywords correspond to symbols, 变量和语法关键字对应符号
+while structured syntactic forms correspond to lists. 而结构化语法形式对应于列表
+
+This representation is the basis for the syntactic extension facilities provided by Scheme 
+for the definition of new syntactic forms in terms of existing syntactic forms and procedures.
+这种表示是Scheme提供的语法扩展功能的基础，这些功能可以根据现有的语法形式和过程定义新的语法形式
+
+It also facilitates the implementation of interpreters, compilers, and other program transformation tools for Scheme directly in Scheme, 
+as well as program transformation tools for other languages in Scheme.
+它还促进了Scheme中解释器、编译器和其他程序转换工具的直接实现，以及Scheme中其他语言的程序转换工具的实现。
+*** Scheme variables and keywords are *lexically scoped*, and Scheme programs are *block-structured*
+Scheme变量和关键字是 *词法作用域* ，Scheme程序是 *块结构* 的。
+
+QUESTION: 标识符的具体定义?
+ANSWER: see 1.1.Scheme Syntax
+*Identifiers* may be imported into a program or library or bound locally within a given block of code such as a library, program, or procedure body. 
+*标识符* 可以导入到程序或库中，也可以在给定的代码块(如库、程序或过程体)中本地绑定。
+
+A *local binding* is visible only lexically, i.e., within the program text that makes up the particular block of code. 
+局部绑定只在词汇上可见，也就是说，在组成特定代码块的程序文本中可见。
+
+An occurrence of an identifier of the same name outside this block refers to a different binding;
+在此块之外出现同名的标识符就会指向不同的绑定;
+
+if no binding for the identifier exists outside the block, then the reference is invalid.
+如果该标识符在块外不存在绑定，则引用无效。
+
+Blocks may be nested, and a binding in one block may shadow a binding for an identifier of the same name in a surrounding block. 
+块可能是嵌套的，一个块中的绑定可能会在周围块中隐藏同名标识符的绑定。
+
+The scope of a binding is the block in which the bound identifier is visible minus any portions of the block in which the identifier is shadowed.
+绑定的作用域是绑定标识符可见的块减去隐藏标识符的块的任何部分。
+
+Block structure and lexical scoping help create programs that are modular, easy to read, easy to maintain, and reliable.
+块结构和词法作用域有助于创建模块化、易于阅读、易于维护和可靠的程序。
+
+Efficient code for lexical scoping is possible because a compiler can determine before program evaluation the scope of all bindings and the binding to which each identifier reference resolves.
+词法作用域的有效代码是可能的，因为编译器可以在程序求值之前确定所有绑定的作用域和每个标识符引用所解析的绑定。
+
+This does not mean, of course, that a compiler can determine the values of all variables, since the actual values are not computed in most cases until the program executes.
+当然，这并不意味着编译器可以确定所有变量的值，因为在大多数情况下，直到程序执行时才会计算实际的值。
+*** *Procedure* in many language
+1. a procedure definition is simply the association of a name with a block of code.
+   Certain variables local to the block are the parameters of the procedure. In some languages,
+2. a procedure definition may appear within another block or procedure so long as the procedure is invoked only during execution of the enclosing block.
+3. procedures can be defined only at top level.
+4. *In Scheme* 
+   - a procedure definition may appear within another block or procedure, 过程定义可能出现在另一个块或过程中
+     and the procedure may be invoked at any time thereafter, 这个过程可以在此后的任何时间被调用，
+     even if the enclosing block has completed its execution. 即使这个封闭块已经完成了它的执行。
+     To support lexical scoping, a procedure carries the lexical context (environment) along with its code. 
+     为了支持词法作用域，过程在其代码中附带词法上下文(环境)。
+
+   - Scheme procedures are not always named. 方案过程并不总是被命名。
+     Instead, procedures are first-class data objects like strings or numbers, and variables are bound to procedures in the same way they are bound to other objects.
+     相反，过程是像字符串或数字一样的一级数据对象，变量与过程的绑定方式与与其他对象的绑定方式相同。
+     TIP: 过程是一等对象,可以不需要命名
+
+   - Scheme procedures may be recursive
+     方案过程可能是递归的
+     A special case of recursion, called tail recursion, is used to express iteration, or looping. 
+     递归的一种特殊情况称为尾部递归，用于表示迭代或循环。
+     
+     A *tail call* occurs when one procedure directly returns the result of invoking another procedure;
+     当一个过程直接返回调用另一个过程的结果时，就会发生尾部调用;
+     
+     *tail recursion* occurs when a procedure recursively tail-calls itself, directly or indirectly.
+     当一个过程直接或间接地递归地尾部调用自己时，就会发生尾部递归。
+     
+     Scheme implementations are required to implement tail calls as jumps (gotos),
+     so the storage overhead normally associated with recursion is avoided. 
+     模式实现需要将尾部调用实现为跳转(gotos)，因此避免了通常与递归相关的存储开销。
+     
+     As a result, Scheme programmers need master only simple procedure calls and recursion and need not be burdened with the usual assortment of looping constructs.
+     TIP: 因此，Scheme程序员只需要掌握简单的过程调用和递归，而不需要处理常见的各种循环结构。
+*** Scheme supports the definition of *arbitrary control structures* with *continuations*
+A continuation is a *procedure* that embodies the remainder of a program at a given point in the program. 
+continuation是一个过程，它包含程序中给定点上的剩余部分。
+
+A continuation may be obtained at any time during the execution of a program. 
+在程序执行期间的任何时候都可以获得continuation。
+
+As with other procedures, a continuation is a first-class object and may be invoked at any time after its creation.
+与其他过程一样，continuation是一级对象，可以在创建后的任何时候调用
+
+Whenever it is invoked, the program immediately continues from the point where the continuation was obtained.
+无论何时调用它，程序都会立即从获得延续的点开始继续。
+
+Continuations allow the implementation of complex control mechanisms including explicit backtracking, multithreading, and coroutines.
+延续允许实现复杂的控制机制，包括显式回溯、多线程和协程。
+*** Scheme also allows programmers to define new *syntactic forms, or syntactic extensions*,  
+by writing *transformation procedures* that determine how each new syntactic form maps to existing syntactic forms.
+
+These transformation procedures are themselves expressed in Scheme with the help of a convenient high-level pattern language that automates syntax checking, input deconstruction, and output reconstruction. 
+这些转换过程本身在Scheme中表示，借助一种方便的高级模式语言，可以自动进行语法检查、输入解析和输出重构。
+
+By default, lexical scoping is maintained through the transformation process, but the programmer can exercise control over the scope of all identifiers appearing in the output of a transformer.
+默认情况下，词法作用域是通过转换过程来维护的，但是程序员可以控制出现在转换器输出中的所有标识符的作用域。
+
+Syntactic extensions are useful for defining new language constructs, for emulating language constructs found in other languages, for achieving the effects of in-line code expansion, and even for emulating entire languages in Scheme.
+语法扩展对于定义新的语言构造、模拟其他语言中的语言构造、实现内联代码扩展的效果、甚至在Scheme中模拟整个语言都很有用。
+
+Most large Scheme programs are built from a mix of syntactic extensions and procedure definitions.
+大多数大型Scheme程序都是混合使用语法扩展和过程定义构建的。
+*** Scheme parents
+**** Lisp
+Scheme inherited from Lisp the treatment of values as first-class objects, 
+several important data types, including symbols and lists, and the representation of programs as objects, among other things.
+Scheme从Lisp继承了将值处理为第一类对象、一些重要的数据类型(包括符号和列表)以及将程序表示为对象等特性。
+**** Algol
+Lexical scoping and block structure are features taken from Algol
+**** Dialect Lisp
+Scheme was the first Lisp dialect to adopt lexical scoping and block structure, first-class procedures, the treatment of tail calls as jumps, continuations, and lexically scoped syntactic extensions.
+Scheme是第一个采用词法作用域和块结构、一级过程、将尾部调用处理为跳转、延续和词法作用域的句法扩展的Lisp方言。
+** 1.1.Scheme Syntax(语法)
+*** First study
    Scheme programs _are make up of_ *keyworkd(关键字),variables(变量),structed 
 forms(结构化形式), constant data(常量数据), whitespace(空白符) and comments注*
 *释.)*
 Keyword, variables and symbols are collectively(全体/共同地) called identifiers
 关键字，变量和符号统称为标识符。
-*** *标识符*
+**** *标识符*
 *Identifiers* maybe formed from letters, digits, and certain specifial characte
 rsinclude ?!.+-*/<=>:$%^_!@, as well as a setof additionall unicode characeers.
 标识符有字母，数字，某些特殊字符 和 Unicode字符。
@@ -46,7 +222,7 @@ Identifiers may *be written* in any mix of upper- and lower-case letters, and
 refer to different identifiers. This is a change from previous versions of the 
 Revised Report.
 标识符是 *大小写敏感* 的，这是一个不同于以前修订报告。
-*** *列表、向量*
+**** *列表、向量*
 Structured forms and list constants *are enclosed within parenthese*, e.g., (a 
 b c) or (* (- x 2) y). The empty list *is written ()*.
 结构化形式和列表常量使用圆括号包含起来.
@@ -62,7 +238,7 @@ in  the range 0 through 255) bracketed by *#vu8(...)*, e.g., *#vu8(30 255 46
 78)*.
 *字节向量* 以 #vu8 打头 包含 0~255 的数值。
 
-*** Strings(字符串)  and Numbers(数值)
+**** Strings(字符串)  and Numbers(数值)
 Strings *are enclosed* in double quotation marks, e.g.,"I am a string".
 *字符串* 使用双引号包含。
 *Characters are preceded by #\, e.g, #\a.*
@@ -85,7 +261,7 @@ Details of the syntax for each type of constant data *are given* in the individ
 ual sections of Character 6 and the formal syntax of Scheme starting on page 45
 5.
 常数据语法在第六章，形式语法在455页后又详细介绍。
-*** Scheme expressions(表达式) and Comments(注释)
+**** Scheme expressions(表达式) and Comments(注释)
 *Scheme expressions* may span several lines, and no explicit terminator is requ
 ired.
 *Scheme 表达式* 可以跨越多行，并且没有明确的结束限定。
@@ -123,6 +299,85 @@ epresentations and can thus never appear as constant in the printed syntax of a
 an operation that returns such a value, e.g., #<procedure> or #<port>.
 一些 *Sehcme值(如过程、端口)* 不能通过标准打印表现，不能以常理形式打印程序语法，
 本书采用 *#<描述>* 的方式显示即 *#<precedure> #<port>*
+*** Second study
+Scheme programs are made up of *keywords*, *variables*, *structured forms*, 
+*constant data* (numbers, characters, strings, quoted vectors, quoted lists, quoted symbols, etc.), 
+*whitespace*, and *comments*.
+
+**** Identifiers (keywords, variables, symbols)
+Keywords, variables, and symbols are collectively called identifiers.
+关键字、变量和符号统称为标识符。
+
+Identifiers may be formed from letters, digits, and certain special characters, including ?, !, ., +, -, *, /, <, =, >, :, $, %, ^, &, _, ~, and @, as well as a set of additional Unicode characters. 
+标识符可以由字母、数字和某些特殊字符组成，包括?、!、。、+、-、*、/、<、=、>、:、$、%、^、&、_、~和@，以及一组额外的Unicode字符。
+
+Identifiers cannot start with an at sign ( @ ) and normally cannot start with any character that can start a number, i.e., a digit, plus sign ( + ), minus sign ( - ), or decimal point ( . ). 
+标识符不能以@开头，通常也不能以任何以数字开头的字符开头，例如，数字、加号(+)、减号(-)或小数点(.)．
+
+Exceptions are +, -, and ..., which are valid identifiers, and any identifier starting with ->. 
+例外情况是+、-和…，是有效的标识符，以及任何以->开头的标识符。
+
+For example, hi, Hello, n, x, x3, x+2, and ?$&*!!! are all identifiers.
+例如，hi, Hello, n, x, x3, x+2，和?$&*!!都是标识符。
+
+Identifiers are delimited by whitespace, comments, parentheses, brackets, string (double) quotes ( " ), and hash marks( # ).
+标识符由空格、注释、圆括号、方括号、字符串(双)引号(")和散列标记(#)分隔。
+
+A delimiter or any other Unicode character may be included anywhere within the name of an identifier as an escape of the form \xsv;, where sv is the scalar value of the character in hexadecimal notation.
+分隔符或任何其他Unicode字符可以包含在标识符名称的任何位置，作为形式\ sv;的转义，其中sv是该字符在十六进制表示法中的标量值。
+
+There is no inherent limit on the length of a Scheme identifier; 
+Scheme标识符的长度没有固有的限制;
+
+Identifiers may be written in any mix of upper- and lower-case letters, and case is significant, i.e., two identifiers are different even if they differ only in case. 
+标识符可以是大小写字母的任意组合，大小写是重要的，也就是说，两个标识符即使只在大小写上不同，也是不同的。
+abcde, Abcde, AbCdE, and ABCDE all refer to different identifiers. *大小写敏感*
+**** *Structured forms* and *list constants* are enclosed within parentheses
+结构化表单和列表常量用圆括号括起来
+
+The empty list is written ().
+
+Matched sets of brackets ( [ ] ) may be used in place of parentheses and are often used to set off the subexpressions of certain standard syntactic forms for readability
+匹配的括号集合([])可以用来代替圆括号，通常用于衬托某些标准语法形式的子表达式，以提高可读性
+**** *Vectors* are written similarly to lists, except that they are preceded by #( and terminated by ), e.g., #(this is a vector of symbols). 
+vector的写法类似于list，除了它们前面有#(并以#结尾)，例如，e.g., #(this is a vector of symbols). 
+**** *Bytevectors* are written as sequences of unsigned byte values (exact integers in the range 0 through 255) bracketed by #vu8( and ), e.g., #vu8(3 250 45 73).
+字节向量被写成无符号字节值序列(0到255之间的精确整数)，用#vu8(和)括起来，例如，#vu8(3 250 45 73)。
+**** *Strings* are enclosed in double quotation marks e.g., "I am a string"
+**** *Characters* are preceded by #\, e.g., #\a.
+**** *Numbers* may be written as integers, e.g., -123, as ratios, e.g., 1/2, 
+in floating-point or scientific notation, e.g., 1.3 or 1e23, 
+or as complex numbers in rectangular or polar notation, e.g., 1.3-2.7i or -1.2@73. 
+*Case is not important* in the syntax of a number
+**** The *boolean* values representing true and false are written #t and #f. 
+Scheme conditional expressions *actually treat #f as false* and all other objects as true, so 3, 0, (), "false", and nil all count as true.
+**** Details of the syntax for each type of *constant data* are given in the individual section
+每种类型的常量数据的语法细节在第6章的各个小节中给出，Scheme的正式语法从第455页开始。
+**** Scheme *expressions* may span several lines, and no explicit terminator is required. 
+方案表达式可以跨几行，不需要显式的结束符。
+
+Since the number of whitespace characters (spaces and newlines) between expressions is not significant, Scheme programs should be indented to show the structure of the code in a way that makes the code as readable as possible.
+因为表达式之间的空白字符(空格和换行符)的数量并不重要，所以Scheme程序应该缩进以显示代码结构，使代码尽可能具有可读性。
+**** *Comments* may appear on any line of a Scheme program, between a semicolon ( ; ) and the end of the line. 
+Comments explaining a procedure or group of procedures are normally placed before the procedures, without indentation.
+
+Comments explaining a procedure or group of procedures are normally placed before the procedures, without indentation
+解释一个过程或一组过程的注释通常放在过程之前，没有缩进
+Multiple comment characters are often used to set off the latter kind of comment, e.g., ;;; The following procedures ....
+后面的注释通常使用多个注释字符
+
+Two other forms of comments are supported:
+支持另外两种形式的注释, 块评论和数据评论
+- Block comments are delimited by #| and |# pairs, and may be nested.
+- A datum comment consists of a #; prefix and the datum (printed data value) that follows it.
+  Datum comments are typically used to comment out individual definitions or expressions. 
+  数据注释通常用于注释掉单独的定义或表达式
+  For example, (three #;(not four) element list)
+**** Some Scheme values, such as procedures and ports
+do not have standard printed representations and can thus never appear as a constant in the printed syntax of a program. 
+This book uses the notation #<description> when showing the output of an operation that returns such a value, e.g., #<procedure> or #<port>.
+一些Scheme值，比如过程和端口，没有标准的打印表示，因此永远不会在程序的打印语法中作为常量出现。本书在显示返回这样一个值的操作的输出时使用了#<描述>符号，例如，#<过程>或#<端口>。
+
 ** 2.Scheme Naming Conventions(Scheme 命名约定)
    Scheme's naming conventions *are designed* to provide a high dagree of regul
 arity. The following is a list of these nameing conventions.
@@ -259,6 +514,7 @@ ning the effected entries.
 另外，主要的数值类型使用 *缩写* 形式表示。 *int* 指整数， *exint* 指精确的整数
 *fx* 指固定大小的数。 这些缩写在本节开头已经有解释。
 * 2. Getting Started(开始)
+TODO: now
   This chapter is an introduction to Scheme for programmers who are new to he l
 anguage. You will get more from this chapter if you are sitting in front of an 
 interactive Scheme system, trying out the examples as you go.
