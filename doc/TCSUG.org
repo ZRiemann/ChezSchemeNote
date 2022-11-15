@@ -1,6 +1,10 @@
 #+TITLE Chez Scheme Version 9 User's Guide Learning Notes(中文)
+#+STARTUP: indent
+
 * 前言
   Chez Scheme 用户手册学习笔记。
+http://cisco.github.io/ChezScheme/csug9.5/csug.html
+
 * 1.引言
   Chez Scheme V9 完全实现R6RS，以及一系列扩展;编译器通过额外增加编译时间，做到
 更快代码。这是The Scheme Programming Language(TSPL4)的扩展。TSPLS4只写R6RS标准
@@ -327,6 +331,8 @@ Chez Scheme 传统扩展名 *.ss* 也可以是任意的或无扩展名。
       (app-run fns)))
    #+END_SRC
 *** Building and Running the Application
+(concatenate-object-files ...)
+
    通过cat / copy 命令将多个对象文件组成一个文件
    对于具有单独库的顶级程序，可以使用compile-whole-program生成单个完全优化的目标文件。
    否则，在连接目标文件时，将每个库放在它所依赖的库之后，程序最后。

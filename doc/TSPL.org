@@ -514,7 +514,6 @@ ning the effected entries.
 另外，主要的数值类型使用 *缩写* 形式表示。 *int* 指整数， *exint* 指精确的整数
 *fx* 指固定大小的数。 这些缩写在本节开头已经有解释。
 * 2. Getting Started(开始)
-TODO: now
   This chapter is an introduction to Scheme for programmers who are new to he l
 anguage. You will get more from this chapter if you are sitting in front of an 
 interactive Scheme system, trying out the examples as you go.
@@ -525,6 +524,7 @@ are-executed, along with how to use simple data structures and control mechanis
 ms.
 通过阅读本章和完成练习，将掌握如何使用Scheme。将学到Scheme程序语法，其如何被执
 行，使用数据结构和控制机制。
+
 ** 1.Interacting with Scheme(和Scheme进行交互)
 *** 1.交互式环境
    Most Scheme system provide an interactive programming enviroment that simpli
@@ -655,6 +655,9 @@ For now it suffices to say that =define= establishes variable bindings =lambda=
 creates procedures, and =*= names the multiplicatoin procedure.
 当前将 =define= 理解为建立变量绑定， =lambda= 理解为创建过程， =*= 表示乘法过程
 就 *足够suffices* 了。
+- define 理解为建立变量绑定
+- lambda 理解为创建过程
+- =*= 表示乘法过程
 Note the form of these expressions.
 记住这些表达式的形式。
 All structured forms *are-enclosed in parentheses* and written in *prefix notation*
@@ -948,7 +951,7 @@ Constant objects, preocedure applications, quote expressions are only three of
 many syntactic forms provided by Scheme.
 *常量、过程、引用 三类核心句法， 外还有少数其他句法根据核心句法扩展的*
 *扩展句法 (let ((key value) ...)) (lambda (arg...) body...)*
-1. 从左向右求值
+1. 从(并非)左向右求值(以任何顺序求值)
 2. 过程变量求值方式和过程求值一样
 (car '(+ - * /) 2 3) => Exception: attempt to apply non-procedure +
 (car (+ - * /) 2 3) => Exception in +: #<procedure -> is not a number
@@ -1099,6 +1102,29 @@ How might the primitive procedure list be-defined?
      ((lambda (x ...) b1 b2 ...) e ...)]))
    扩展句法
 
+- <program>
+  + <form>*
+    - <definition>
+      + <variable definition>
+      + (begin <definition>*)   
+    - <expression>
+      + <constant>
+        - <boolean> #t #f
+        - <number>
+        - <charcter>
+        - <string>
+      + <variable>
+      + (quote <datum>)
+      + (lambda <formals> <expression> <expression>*)
+        - <formals>
+          + <variable>
+          + (<variable>*)
+          + (<variable> <variable>* . <variable>)
+      + (if <expression> <expression> <expression>)
+      + (set! <variable> <expression>)
+      + <application>
+        - (<expression> <expression>*)
+
 ** 3.2 More Recursion(更多递归)
 ** 3.3 Continuations(连续性)
    - call/cc ; 捕获任意表达式的的continuation
@@ -1113,7 +1139,7 @@ How might the primitive procedure list be-defined?
       (* 5 4))) ;=> 20 = p
    (call/cc
     (lambda (k)
-      (* 5 (k 4)))) ;=> 4 = p
+      (* 5 (k 4)))) ;=> 4 = v
 
    (define kon #f)
    (define kon1 #f)
@@ -1329,7 +1355,61 @@ How might the primitive procedure list be-defined?
    #+END_SRC
 ** 3.5 Internal Definitions(内部定义)
 ** 3.6 Libraries(库)
+* 4. Procedures and Variable Bindings
+** 4.1. Variables References
+syntax: variable
+returns: the value of variable
+** 4.2. Lambda
+syntax: (lambda formals body1 body's ...)
+returns: a procedure
+libraries: (rnrs base), (rnrs)
+** 4.3. Case-Lambda ;类似C++函数重载
+syntax: (case-lambda clause ...) 
+        cluase => [formals body1 body2 ...] 
+returns: a procedure 
+libraries: (rnrs control), (rnrs) 
+- let : 参数计算无顺序 , 右边参数 *不可以* 使用左边参数定义 
+- let*: 参数计算从左到右,右边参数 *可以* 使用左边参数定义
+- letrec: 允许参数过程递归调用自己
+- letrec*: 参考let*
+#+BEGIN_SRC scheme
+(define make-list
+  (case-lambda
+    [(n) (make-list n #f)]
+    [(n x)
+     (do ([n n (- n 1)] [ls '() (cons x ls)])
+         ((zero? n) ls))]))
+
+(make-list 3 'a)
+(make-list 3)
+#+END_SRC
+** 4.4. Local Binding
+** 4.5. Multiple Values
+syntax: (let-values ((forms expr) ...) body1, body2 ...)
+syntax: (let*-values ((forms expr) ...) body1, body2 ...)
+returns: the values of the final body expression
+** 4.6. Variable Definitions
+syntax: (define var expr)
+syntax: (define var)
+; lambda procedure var0 <=> procedure name
+syntax: (define (var0 var1 ...) body1 body2 ...)
+syntax: (define (var0 . varx) body1 body2 ...)
+syntax: (define (var0 var1 var2 ... . varx) body1 body2 ...)
+** 4.7. Assignment
+syntax: (set! var expr)
+returns: unspecified
+libraries: (rnrs base), (rnrs)
+
 * 5. Control Operations
+
+** 5.1. Procedure Application
+*** syntax: (expr0 expr1 ...)
+returns: values of applying the value of expr0 to the values of expr1 ...
+*** procedure: (apply procedure obj ... list)
+returns: the values of applying procedure to obj ... and the elements of list
+** 5.2. Sequencing
+*** syntax: (begin expr1 expr2 ...)
+returns: the values of the last subexpression
 ** 5.3.Conditionals
 *** syntax: (if test consequent alternative) 
     syntax: (if test consequent) 
@@ -1505,7 +1585,33 @@ How might the primitive procedure list be-defined?
             ((zero? i) j))))
     (sum-all 10)
     #+END_SRC
-    
+** 5.5. Mapping and Folding
+*** procedure: (map procedure list1 list2 ...)
+#+BEGIN_SRC scheme
+(map abs '(1 -2 3 -4 5 -6)) ; =>  (1 2 3 4 5 6)
+
+(map (lambda (x y) (* x y))
+     '(1 2 3 4)
+     '(8 7 6 5)) ; => (8 14 18 20)
+
+(define map
+  (lambda (f ls . more)
+    (if (null? more)
+        ;; true case
+        (let map1 ([ls ls])
+          (if (null? ls)
+              '()
+              (cons (f (car ls))
+                    (map1 (cdr ls)))))
+        ;; false case
+        (let map-more ([ls ls] [more more]))
+        (if (null? ls)
+            '()
+            (cons
+             (apply f (car ls) (map car more))
+             (map-more (cdr ls) (map cdr more)))))))
+#+END_SRC
+*** procedure: (for-each procedure list1 list2 ...)
 * 6. Operations on Objects(对象的操作)
   本章描述对象支持的操作，对象包括：
   list,numbers,characters,strings,vectors,bytevectors,symbols,booleans,
